@@ -1,0 +1,113 @@
+<robot name="prop_arm" version="1.0">
+  <joint name="arm.001_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000"/>
+    <origin rpy="-0.00000 1.57080 0.00000" xyz="0.43129 -0.58144 0.11764"/>
+    <parent link="table_link"/>
+    <child link="arm.001_link"/>
+    <axis xyz="0.00000 0.00000 -1.00000"/>
+  </joint>
+  <joint name="motor.001_link_joint" type="fixed">
+    <origin rpy="1.57080 -1.57080 0.00000" xyz="0.40028 -0.03651 0.02656"/>
+    <parent link="arm.001_link"/>
+    <child link="motor.001_link"/>
+  </joint>
+  <joint name="prop_link_joint" type="revolute">
+    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000"/>
+    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00004 -0.00000 0.02475"/>
+    <parent link="motor.001_link"/>
+    <child link="prop_link"/>
+    <axis xyz="0.00000 0.00000 1.00000"/>
+  </joint>
+  <link name="arm.001_link">
+    <collision name="arm.001_collision">
+      <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 0.00000 -0.00000"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.004.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.45780" ixy="-0.00003" ixz="-0.00533" iyy="0.45909" iyz="-0.00314" izz="0.00510"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.14437 -0.00020 0.01985"/>
+      <mass value="10.00000"/>
+    </inertial>
+    <visual name="arm.001">
+      <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 -0.00000 -0.00000"/>
+      <material name="Material.012"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.004.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="motor.001_link">
+    <collision name="motor.001_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 -0.00000 0.00000"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.005.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00229" ixy="0.00020" ixz="-0.00002" iyy="0.00144" iyz="0.00012" izz="0.00226"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00013 0.00073 -0.00279"/>
+      <mass value="10.00000"/>
+    </inertial>
+    <visual name="motor.001">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <material name="Material.015"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.005.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="prop_link">
+    <collision name="prop_collision">
+      <origin rpy="-0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.001.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="0.00022" ixy="-0.00077" ixz="-0.00002" iyy="0.03639" iyz="0.00000" izz="0.03655"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00007 0.00056 0.00001"/>
+      <mass value="10.00000"/>
+    </inertial>
+    <visual name="prop">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 -0.00000 0.00000"/>
+      <material name="Material.014"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.001.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </visual>
+  </link>
+  <link name="table_link">
+    <collision name="table_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="4.49421" ixy="1.19011" ixz="-0.32403" iyy="1.83979" iyz="0.67570" izz="5.09395"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00341 -0.01201 -0.10842"/>
+      <mass value="10.00000"/>
+    </inertial>
+    <visual name="table">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <material name="Material.011"/>
+      <geometry>
+        <mesh filename="../meshes/stl/arm.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </visual>
+  </link>
+  <material name="Material.011">
+    <color rgba="0.17255 0.06667 0.01176 1.00000"/>
+  </material>
+  <material name="Material.012">
+    <color rgba="0.16078 0.16078 0.16078 1.00000"/>
+  </material>
+  <material name="Material.014">
+    <color rgba="0.00000 0.00000 0.00000 1.00000"/>
+  </material>
+  <material name="Material.015">
+    <color rgba="0.80000 0.00000 0.00000 1.00000"/>
+  </material>
+</robot>
