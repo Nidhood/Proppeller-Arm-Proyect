@@ -1,23 +1,23 @@
 <?xml version="1.0"?>
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="prop_arm_control">
 
-    <!-- ros2_control plugin -->
+    <!-- Gazebo plugin for Prop Arm hardware interface -->
     <gazebo>
         <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="libgz_ros2_control-system.so">
             <parameters>$(find prop_arm_gazebo_control)/config/arm_position_controller.yaml</parameters>
         </plugin>
     </gazebo>
 
-    <!-- Control system definition -->
+    <!-- ros2_control system -->
     <ros2_control name="PropArmSystem" type="system">
         <hardware>
             <plugin>prop_arm_gazebo_control/PropArmHardware</plugin>
         </hardware>
-
         <joint name="arm_link_joint">
             <command_interface name="position"/>
             <state_interface name="position"/>
             <state_interface name="velocity"/>
         </joint>
     </ros2_control>
+
 </robot>

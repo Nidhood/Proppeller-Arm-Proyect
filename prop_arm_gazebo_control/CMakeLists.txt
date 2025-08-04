@@ -11,8 +11,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(gz_ros2_control REQUIRED) 
-find_package(controller_interface REQUIRED)
+find_package(gz_ros2_control REQUIRED)    # runtime
+# find_package(controller_interface REQUIRED)  # opcional, si lo necesitas
 
 # Include headers
 include_directories(include)
@@ -27,13 +27,15 @@ ament_target_dependencies(prop_arm_hardware_interface
     hardware_interface
     pluginlib
     gz_ros2_control
-    controller_interface
 )
 
-# Export plugin
-pluginlib_export_plugin_description_file(hardware_interface prop_arm_hardware_interface_plugin.xml)
+# Export plugin description
+pluginlib_export_plugin_description_file(
+    hardware_interface
+    prop_arm_hardware_interface_plugin.xml
+)
 
-# Install folders and targets
+# Install the plugin library
 install(
     TARGETS prop_arm_hardware_interface
     EXPORT export_${PROJECT_NAME}
@@ -42,31 +44,31 @@ install(
     RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY
-    config
-    launch
-    urdf
+# Install configs, launch files and URDF
+install(
+    DIRECTORY config launch urdf
     DESTINATION share/${PROJECT_NAME}
 )
 
-install(DIRECTORY include/
+# Install public headers
+install(
+    DIRECTORY include/
     DESTINATION include/
 )
 
+# Install plugin description file
 install(
-    FILES resource/prop_arm_hardware_interface_plugin.xml
+    FILES prop_arm_hardware_interface_plugin.xml
     DESTINATION share/${PROJECT_NAME}
 )
 
-# Export info for downstream packages
+# Export for downstream packages
 ament_export_dependencies(
     rclcpp
     hardware_interface
     pluginlib
     gz_ros2_control
-    controller_interface
 )
-
 ament_export_include_directories(include)
 ament_export_libraries(prop_arm_hardware_interface)
 

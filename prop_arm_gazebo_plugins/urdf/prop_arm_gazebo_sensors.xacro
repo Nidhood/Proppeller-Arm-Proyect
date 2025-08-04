@@ -4,10 +4,10 @@
     <!-- IMU sensor -->
     <!-- <gazebo reference="base_link">
     <sensor name="imu_sensor" type="imu">
-      <always_on>1</always_on>
-      <update_rate>250</update_rate>
-      <imu>
-          <angular_velocity>
+    <always_on>1</always_on>
+    <update_rate>250</update_rate>
+    <imu>
+    <angular_velocity>
             <!-- Noise modeled after IIM42653 -->
     <!-- 0.05 deg/s converted to rad/s -->
     <x>
