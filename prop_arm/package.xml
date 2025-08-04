@@ -1,0 +1,24 @@
+<package>
+
+    <!--- Initial package configuration -->
+    <name>prop_arm</name>
+    <version>0.0.1</version>
+    <description>Propeller Arm Project configuration</description>
+    <maintainer email="ivan.oroz34@gmail.com">Nidhood</maintainer>
+    <license>BSD-3-Clause</license>
+    <author email="ivan.oroz34@gmail.com">Ivan Orozco</author>
+
+    <!-- Build tool dependencies  for ament package -->
+    <buildtool_depend>ament_cmake</buildtool_depend>
+
+    <!-- Dependencies needed after this package is built -->
+    <run_depend>prop_arm_description</run_depend>
+    <run_depend>prop_arm_gazebo</run_depend>
+    <run_depend>prop_arm_gazebo_control</run_depend>
+    <run_depend>prop_arm_gazebo_plugins</run_depend>
+
+    <!-- Export dependencies -->
+    <export>
+        <build_type>ament_cmake</build_type>
+    </export>
+</package>

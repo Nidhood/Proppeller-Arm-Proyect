@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<library path="prop_arm_hardware_interface">
+    <class name="prop_arm_gazebo_control/PropArmHardware" type="prop_arm_gazebo_control::PropArmHardware" base_class_type="gz_ros2_control::GazeboSimSystemInterface">
+        <description>Hardware interface for Prop Arm with Gazebo + ROS 2 Control</description>
+    </class>
+</library>
