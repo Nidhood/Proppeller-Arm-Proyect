@@ -1,28 +1,36 @@
-<robot name="prop_arm" version="1.0">
-  <joint name="arm.001_link_joint" type="revolute">
-    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000"/>
-    <origin rpy="-0.00000 1.57080 0.00000" xyz="0.43129 -0.58144 0.11764"/>
-    <parent link="table_link"/>
-    <child link="arm.001_link"/>
-    <axis xyz="0.00000 0.00000 -1.00000"/>
-  </joint>
-  <joint name="motor.001_link_joint" type="fixed">
-    <origin rpy="1.57080 -1.57080 0.00000" xyz="0.40028 -0.03651 0.02656"/>
-    <parent link="arm.001_link"/>
-    <child link="motor.001_link"/>
-  </joint>
-  <joint name="prop_link_joint" type="revolute">
-    <limit lower="-3.14000" upper="3.14000" effort="0.00000" velocity="0.00000"/>
-    <origin rpy="0.00000 0.00000 0.00000" xyz="0.00004 -0.00000 0.02475"/>
-    <parent link="motor.001_link"/>
-    <child link="prop_link"/>
-    <axis xyz="0.00000 0.00000 1.00000"/>
-  </joint>
-  <link name="arm.001_link">
-    <collision name="arm.001_collision">
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="prop_arm">
+
+  <!-- World link -->
+  <link name="world"/>
+
+  <!-- Main robot link -->
+  <link name="base_link">
+    <collision name="base_collision">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/base.stl" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <inertia ixx="4.49421" ixy="1.19011" ixz="-0.32403" iyy="1.83979" iyz="0.67570" izz="5.09395"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00341 -0.01201 -0.10842"/>
+      <mass value="10.00000"/>
+    </inertial>
+    <visual name="base">
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/base.dae" scale="1.00000 1.00000 1.00000"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Arm link -->
+  <link name="arm_link">
+    <collision name="arm_collision">
       <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 0.00000 -0.00000"/>
       <geometry>
-        <mesh filename="../meshes/stl/arm.004.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/arm.stl" scale="1.00000 1.00000 1.00000"/>
       </geometry>
     </collision>
     <inertial>
@@ -30,19 +38,20 @@
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.14437 -0.00020 0.01985"/>
       <mass value="10.00000"/>
     </inertial>
-    <visual name="arm.001">
+    <visual name="arm">
       <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 -0.00000 -0.00000"/>
-      <material name="Material.012"/>
       <geometry>
-        <mesh filename="../meshes/stl/arm.004.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/arm.dae" scale="1.00000 1.00000 1.00000"/>
       </geometry>
     </visual>
   </link>
-  <link name="motor.001_link">
-    <collision name="motor.001_collision">
+
+  <!-- Motor link -->
+  <link name="motor_link">
+    <collision name="motor_collision">
       <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 -0.00000 0.00000"/>
       <geometry>
-        <mesh filename="../meshes/stl/arm.005.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/motor.stl" scale="1.00000 1.00000 1.00000"/>
       </geometry>
     </collision>
     <inertial>
@@ -50,19 +59,20 @@
       <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00013 0.00073 -0.00279"/>
       <mass value="10.00000"/>
     </inertial>
-    <visual name="motor.001">
+    <visual name="motor">
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
-      <material name="Material.015"/>
       <geometry>
-        <mesh filename="../meshes/stl/arm.005.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/motor.dae" scale="1.00000 1.00000 1.00000"/>
       </geometry>
     </visual>
   </link>
+
+  <!-- Propeller link-->
   <link name="prop_link">
     <collision name="prop_collision">
       <origin rpy="-0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
       <geometry>
-        <mesh filename="../meshes/stl/arm.001.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/prop.stl" scale="1.00000 1.00000 1.00000"/>
       </geometry>
     </collision>
     <inertial>
@@ -72,42 +82,50 @@
     </inertial>
     <visual name="prop">
       <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 -0.00000 0.00000"/>
-      <material name="Material.014"/>
       <geometry>
-        <mesh filename="../meshes/stl/arm.001.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/prop.dae" scale="1.00000 1.00000 1.00000"/>
       </geometry>
     </visual>
   </link>
-  <link name="table_link">
-    <collision name="table_collision">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
-      <geometry>
-        <mesh filename="../meshes/stl/arm.stl" scale="1.00000 1.00000 1.00000"/>
-      </geometry>
-    </collision>
-    <inertial>
-      <inertia ixx="4.49421" ixy="1.19011" ixz="-0.32403" iyy="1.83979" iyz="0.67570" izz="5.09395"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00341 -0.01201 -0.10842"/>
-      <mass value="10.00000"/>
-    </inertial>
-    <visual name="table">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
-      <material name="Material.011"/>
-      <geometry>
-        <mesh filename="../meshes/stl/arm.stl" scale="1.00000 1.00000 1.00000"/>
-      </geometry>
-    </visual>
-  </link>
-  <material name="Material.011">
-    <color rgba="0.17255 0.06667 0.01176 1.00000"/>
-  </material>
-  <material name="Material.012">
-    <color rgba="0.16078 0.16078 0.16078 1.00000"/>
-  </material>
-  <material name="Material.014">
-    <color rgba="0.00000 0.00000 0.00000 1.00000"/>
-  </material>
-  <material name="Material.015">
-    <color rgba="0.80000 0.00000 0.00000 1.00000"/>
-  </material>
+
+  <!-- Joint between world and base -->
+  <joint name="world_base_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+
+  <!-- Joint between base and arm -->
+  <joint name="arm_link_joint" type="continuous"> 
+    <axis xyz="0 0 -1"/>
+    <origin rpy="0 1.57080 0" xyz="0.43129 -0.58144 0.11764"/>
+    <limit effort="1500.0" velocity="10.0"/>
+    <dynamics damping="0.8" friction="0.3"/>
+    <parent link="base_link"/>
+    <child link="arm_link"/>
+  </joint>
+
+  <!-- Joint between arm and motor -->
+  <joint name="motor_link_joint" type="fixed">
+    <origin rpy="1.57080 -1.57080 0.00000" xyz="0.40028 -0.03651 0.02656"/>
+    <parent link="arm_link"/>
+    <child link="motor_link"/>
+  </joint>
+
+  <!-- Joint between motor and propeller -->
+  <joint name="prop_link_joint" type="continuous">
+    <dynamics damping="0.01"/>
+    <origin rpy="0 0 0" xyz="0.00004 0 0.02475"/>
+    <parent link="motor_link"/>
+    <child link="prop_link"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Include materials for Gazebo -->
+  <xacro:include filename="$(find prop_arm_gazebo)/urdf/prop_arm_materials.xacro"/>
+
+  <!-- Include gazebo plugins -->
+  <xacro:include filename="$(find prop_arm_gazebo_plugins)/urdf/prop_arm_gazebo_plugins.xacro"/>
+
+  <!-- Include control interface -->
+  <xacro:include filename="$(find prop_arm_gazebo_control)/urdf/prop_arm_control.xacro"/>
 </robot>
