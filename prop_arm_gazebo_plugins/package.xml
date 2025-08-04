@@ -12,14 +12,6 @@
     <!-- Build tool dependencies for ament package -->
     <buildtool_depend>ament_cmake</buildtool_depend>
 
-    <!-- Exec dependencies -->
-    <exec_depend>gazebo_ros2_control</exec_depend>
-
-    <!-- Build dependencies -->
-    <build_depend>gazebo_ros2_control</build_depend>    
-    <build_export_depend>gazebo_ros2_control</build_export_depend>
-
-
     <!-- Test dependencies -->
     <test_depend>ament_cmake_gtest</test_depend>
     <test_depend>ament_lint_auto</test_depend>
