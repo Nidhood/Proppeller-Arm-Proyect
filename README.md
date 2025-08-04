@@ -1,6 +1,5 @@
 Below is an updated **README.md** that reflects the true goal of your project—modeling and controlling a single-axis propeller arm per the MIT IntroControl Prelab 10 model—and cites that page as a reference.
 
-````markdown
 # ⚙️ Propeller Arm Control System
 
 > **Reference**: “Prelab 10: Modeling a Propeller and Arm”  
@@ -47,8 +46,6 @@ prop_arm_ws/
     └── prop_arm_gazebo_plugins/
         └── urdf/            ← sensor & motor plugins
 ```
-````
-
 ---
 
 ## 🛠️ Technology Stack
