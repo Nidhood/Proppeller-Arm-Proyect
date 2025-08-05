@@ -3,26 +3,30 @@
     <name>prop_arm_gazebo_control</name>
     <version>0.0.1</version>
     <description>Control and hardware interface for the Prop Arm system using ros2_control</description>
+
     <maintainer email="ivan.oroz34@gmail.com">Nidhood</maintainer>
     <license>BSD-3-Clause</license>
 
     <buildtool_depend>ament_cmake</buildtool_depend>
 
-    <!-- Runtime and build dependencies -->
+    <!-- Core dependencies -->
     <depend>rclcpp</depend>
     <depend>hardware_interface</depend>
     <depend>pluginlib</depend>
-    <depend>gz_ros2_control</depend>
-    <depend>controller_interface</depend>
+
+    <!-- Gazebo dependencies -->
+    <depend>gz-transport13</depend>
+    <depend>gz-msgs10</depend>
+
+    <!-- Optional Gazebo integration -->
+    <exec_depend>gz_ros2_control</exec_depend>
 
     <!-- Testing -->
     <test_depend>ament_lint_auto</test_depend>
     <test_depend>ament_lint_common</test_depend>
-    <test_depend>ament_cmake_gtest</test_depend>
 
-    <!-- Plugin export -->
     <export>
         <build_type>ament_cmake</build_type>
-        <pluginlib plugin="${prefix}/prop_arm_hardware_interface_plugin.xml"/>
+        <hardware_interface plugin="${prefix}/prop_arm_hardware_interface_plugin.xml"/>
     </export>
 </package>

@@ -11,8 +11,11 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
-find_package(gz_ros2_control REQUIRED)    # runtime
-# find_package(controller_interface REQUIRED)  # opcional, si lo necesitas
+find_package(gz_ros2_control REQUIRED)
+
+# Gazebo dependencies for transport
+find_package(gz-transport13 REQUIRED)
+find_package(gz-msgs10 REQUIRED)
 
 # Include headers
 include_directories(include)
@@ -27,6 +30,12 @@ ament_target_dependencies(prop_arm_hardware_interface
     hardware_interface
     pluginlib
     gz_ros2_control
+)
+
+# Link Gazebo libraries
+target_link_libraries(prop_arm_hardware_interface
+    gz-transport13::gz-transport13
+    gz-msgs10::gz-msgs10
 )
 
 # Export plugin description
@@ -54,12 +63,6 @@ install(
 install(
     DIRECTORY include/
     DESTINATION include/
-)
-
-# Install plugin description file
-install(
-    FILES prop_arm_hardware_interface_plugin.xml
-    DESTINATION share/${PROJECT_NAME}
 )
 
 # Export for downstream packages
