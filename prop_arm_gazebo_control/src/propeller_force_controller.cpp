@@ -1,69 +1,9 @@
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/float64.hpp>
-#include <sensor_msgs/msg/joint_state.hpp>
-#include <geometry_msgs/msg/twist.hpp>
-#include <cmath>
-#include <memory>
+#include "prop_arm_gazebo_control/propeller_force_controller.hpp"
 
-class PropellerForceController : public rclcpp::Node
+namespace prop_arm_control
 {
-private:
-    // PID Controller parameters
-    double kp_;
-    double ki_;
-    double kd_;
 
-    double integral_error_;
-    double previous_error_;
-    double target_angle_;
-    double current_angle_;
-    double current_velocity_;
-
-    // Motor limits
-    double max_motor_force_;
-    double min_motor_force_;
-    double control_frequency_;
-    double dt_;
-
-    // Publishers
-    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr motor_effort_pub_;
-    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr motor_velocity_pub_;
-
-    // Subscribers
-    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr target_angle_sub_;
-
-    // Timer
-    rclcpp::TimerBase::SharedPtr control_timer_;
-
-    // Logging and status counters
-    int log_counter_;
-    bool joint_state_received_;
-    int startup_counter_;
-    bool auto_started_;
-
-    // Startup timer for diagnostics
-    rclcpp::TimerBase::SharedPtr startup_timer_;
-
-    // Angle transformation methods
-    double mitToGazeboAngle(double mit_angle_degrees) const
-    {
-        // MIT: 0° = horizontal, positive = up
-        // Convert to radians
-        double mit_radians = mit_angle_degrees * M_PI / 180.0;
-        // With corrected URDF, no transformation needed
-        return mit_radians;
-    }
-
-    double gazeboToMitAngle(double gazebo_radians) const
-    {
-        // Convert from Gazebo frame back to MIT frame
-        // With corrected URDF, no transformation needed
-        return gazebo_radians * 180.0 / M_PI;
-    }
-
-public:
-    PropellerForceController() : Node("propeller_force_controller")
+    PropellerForceController::PropellerForceController() : Node("propeller_force_controller")
     {
         RCLCPP_INFO(this->get_logger(), "Initializing Propeller Force Controller...");
 
@@ -148,8 +88,23 @@ public:
         RCLCPP_INFO(this->get_logger(), "Controller will auto-start when joint states are received");
     }
 
-private:
-    void startup_diagnostics()
+    double PropellerForceController::mitToGazeboAngle(double mit_angle_degrees) const
+    {
+        // MIT: 0° = horizontal, positive = up
+        // Convert to radians
+        double mit_radians = mit_angle_degrees * M_PI / 180.0;
+        // With corrected URDF, no transformation needed
+        return mit_radians;
+    }
+
+    double PropellerForceController::gazeboToMitAngle(double gazebo_radians) const
+    {
+        // Convert from Gazebo frame back to MIT frame
+        // With corrected URDF, no transformation needed
+        return gazebo_radians * 180.0 / M_PI;
+    }
+
+    void PropellerForceController::startup_diagnostics()
     {
         startup_counter_++;
 
@@ -191,7 +146,7 @@ private:
         }
     }
 
-    void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg)
+    void PropellerForceController::joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg)
     {
         if (!joint_state_received_)
         {
@@ -219,7 +174,7 @@ private:
                              "Joint 'arm_link_joint' not found in joint states");
     }
 
-    void target_angle_callback(const std_msgs::msg::Float64::SharedPtr msg)
+    void PropellerForceController::target_angle_callback(const std_msgs::msg::Float64::SharedPtr msg)
     {
         // Input is in MIT frame (degrees), convert to Gazebo frame (radians)
         target_angle_ = mitToGazeboAngle(msg->data);
@@ -229,7 +184,7 @@ private:
                     msg->data, target_angle_);
     }
 
-    void send_zero_commands()
+    void PropellerForceController::send_zero_commands()
     {
         auto effort_msg = std_msgs::msg::Float64();
         effort_msg.data = 0.0;
@@ -240,7 +195,7 @@ private:
         motor_velocity_pub_->publish(velocity_msg);
     }
 
-    void control_loop()
+    void PropellerForceController::control_loop()
     {
         // Skip control if no joint state data received yet
         if (!joint_state_received_)
@@ -317,7 +272,8 @@ private:
                         motor_velocity);
         }
     }
-};
+
+} // namespace prop_arm_control
 
 int main(int argc, char *argv[])
 {
@@ -325,7 +281,7 @@ int main(int argc, char *argv[])
 
     try
     {
-        auto node = std::make_shared<PropellerForceController>();
+        auto node = std::make_shared<prop_arm_control::PropellerForceController>();
 
         RCLCPP_INFO(node->get_logger(), "Starting Propeller Force Controller...");
         RCLCPP_INFO(node->get_logger(), "Controller will automatically stabilize arm at horizontal position");

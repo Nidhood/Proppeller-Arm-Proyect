@@ -3,21 +3,21 @@ controller_manager:
     update_rate: 100
     use_sim_time: true
 
-    # Define all available controllers:
+    # Define only essential controllers for MIT project:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-    # Force/Effort controller for direct thrust control:
+    # Position controller for MIT angle control (primary objective)
+    position_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    # Force/Effort controller for direct thrust control (secondary)
     motor_force_controller:
       type: effort_controllers/JointGroupEffortController
 
-    # Velocity controller for direct velocity control
+    # Velocity controller for direct velocity control (debugging)
     velocity_controller:
       type: velocity_controllers/JointGroupVelocityController
-
-    # Position controller using JointTrajectoryController instead:
-    position_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
 
 # Configure the joint state broadcaster:
 joint_state_broadcaster:
@@ -26,21 +26,7 @@ joint_state_broadcaster:
     joints: [arm_link_joint]
     interfaces: [position, velocity, effort]
 
-# Configure the force/effort controller for motor thrust:
-motor_force_controller:
-  ros__parameters:
-    use_sim_time: true
-    joints: [arm_link_joint]
-    command_interfaces: [effort]
-
-# Configure the velocity controller for direct motor speed:
-velocity_controller:
-  ros__parameters:
-    use_sim_time: true
-    joints: [arm_link_joint]
-    command_interfaces: [velocity]
-
-# Configure the position controller for angle control using JointTrajectoryController:
+# Primary controller: Position control for MIT angle control
 position_controller:
   ros__parameters:
     use_sim_time: true
@@ -48,8 +34,34 @@ position_controller:
     command_interfaces: [position]
     state_interfaces: [position, velocity]
     allow_partial_joints_goal: true
+
+    # More aggressive constraints for MIT project
     constraints:
-      stopped_velocity_tolerance: 0.05
+      stopped_velocity_tolerance: 0.1
       goal_time: 0.0
+      arm_link_joint:
+        trajectory: 0.2
+        goal: 0.1
+
+    gains:
+      arm_link_joint:
+        p: 100.0
+        i: 5.0
+        d: 15.0
+
     state_publish_rate: 100.0
     action_monitor_rate: 20.0
+
+# Secondary controller: Force control for direct thrust
+motor_force_controller:
+  ros__parameters:
+    use_sim_time: true
+    joints: [arm_link_joint]
+    command_interfaces: [effort]
+
+# Debug controller: Velocity control
+velocity_controller:
+  ros__parameters:
+    use_sim_time: true
+    joints: [arm_link_joint]
+    command_interfaces: [velocity]

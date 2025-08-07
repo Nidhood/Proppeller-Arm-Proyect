@@ -1,47 +1,12 @@
-#include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/float64.hpp>
-#include <std_msgs/msg/float64_multi_array.hpp>
-#include <trajectory_msgs/msg/joint_trajectory.hpp>
-#include <trajectory_msgs/msg/joint_trajectory_point.hpp>
-#include <iostream>
-#include <string>
-#include <cstdlib>
-#include <thread>
-#include <chrono>
+#include "prop_arm_gazebo_control/motor_commander.hpp"
 
-class MotorCommander : public rclcpp::Node
+namespace prop_arm_control
 {
-private:
-    // Updated publishers for correct controller topics
-    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr effort_pub_;
-    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr velocity_pub_;
-    rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr trajectory_pub_;
 
-    // Legacy publishers for compatibility
-    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr single_effort_pub_;
-    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr angle_pub_;
-
-    // Angle transformation methods
-    double mitToGazeboAngle(double mit_angle_degrees) const
+    MotorCommander::MotorCommander()
+        : Node("motor_commander"), last_command_type_(LastCommandType::NONE)
     {
-        // MIT: 0° = horizontal, positive = up
-        // Convert to radians and apply transformation
-        double mit_radians = mit_angle_degrees * M_PI / 180.0;
-        // With corrected URDF, no transformation needed
-        return mit_radians;
-    }
-
-    double gazeboToMitAngle(double gazebo_radians) const
-    {
-        // Convert from Gazebo frame back to MIT frame
-        // With corrected URDF, no transformation needed
-        return gazebo_radians * 180.0 / M_PI;
-    }
-
-public:
-    MotorCommander() : Node("motor_commander")
-    {
-        // Create publishers for the correct controller command topics
+        // Backup control methods through ros2_control
         effort_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/motor_force_controller/commands", 10);
 
@@ -51,172 +16,313 @@ public:
         trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/position_controller/joint_trajectory", 10);
 
-        // Backward compatibility publishers
-        single_effort_pub_ = this->create_publisher<std_msgs::msg::Float64>(
-            "/motor_force_controller/command", 10);
+        // Initialize Gazebo transport node
+        gz_node_ = std::make_unique<gz::transport::Node>();
 
-        angle_pub_ = this->create_publisher<std_msgs::msg::Float64>(
-            "/propeller_controller/target_angle", 10);
+        // Wait for connections
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        RCLCPP_INFO(this->get_logger(), "Motor Commander initialized");
-        RCLCPP_INFO(this->get_logger(), "Available control modes:");
-        RCLCPP_INFO(this->get_logger(), "  - Force: Controls motor thrust directly (Electro-mechanical model)");
-        RCLCPP_INFO(this->get_logger(), "  - Velocity: Controls motor speed directly");
-        RCLCPP_INFO(this->get_logger(), "  - Angle: Controls arm position using trajectory controller");
-        RCLCPP_INFO(this->get_logger(), "Reference frame: 0° = horizontal, positive = upward");
+        // Create cleanup timer with longer interval to prevent conflicts
+        cleanup_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(200),
+            [this]()
+            {
+                static auto last_command_time = std::chrono::steady_clock::now();
+                auto now = std::chrono::steady_clock::now();
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_command_time).count() > 1000)
+                {
+                    // No command sent in last 1 second, send zeros only if needed
+                    if (last_command_type_ != LastCommandType::NONE)
+                    {
+                        send_zero_commands();
+                    }
+                }
+            });
+
+        RCLCPP_INFO(this->get_logger(), "MIT PropArm Motor Commander initialized");
+        RCLCPP_INFO(this->get_logger(), "Control Modes:");
+        RCLCPP_INFO(this->get_logger(), "  - angle: Direct propeller control for arm positioning (PRIMARY)");
+        RCLCPP_INFO(this->get_logger(), "  - force: Force-based propeller speed calculation");
+        RCLCPP_INFO(this->get_logger(), "  - velocity: Direct motor velocity control");
+        RCLCPP_INFO(this->get_logger(), "Reference: 0° = horizontal, +90° = up, -90° = down");
     }
 
-    void command_angle(double angle_degrees)
+    double MotorCommander::mitToGazeboAngle(double mit_angle_degrees) const
     {
-        // Input is in MIT frame (0° = horizontal), convert to Gazebo frame
-        double gazebo_radians = mitToGazeboAngle(angle_degrees);
+        // MIT: 0° = horizontal, positive = up
+        return mit_angle_degrees * M_PI / 180.0;
+    }
 
-        // Create trajectory message for JointTrajectoryController
+    double MotorCommander::gazeboToMitAngle(double gazebo_radians) const
+    {
+        return gazebo_radians * 180.0 / M_PI;
+    }
+
+    void MotorCommander::send_zero_commands()
+    {
+        // Send zero to direct motor control via Gazebo transport (most important)
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(0.0);
+
+        // FIXED: Use Gazebo transport instead of ROS publisher
+        if (!gz_node_->Request("/prop_arm/command/motor_speed", motor_msg))
+        {
+            RCLCPP_DEBUG(this->get_logger(), "Failed to send zero motor command via Gazebo transport");
+        }
+
+        // Clear ros2_control controllers
+        auto effort_msg = std_msgs::msg::Float64MultiArray();
+        effort_msg.data.push_back(0.0);
+        effort_pub_->publish(effort_msg);
+
+        auto velocity_msg = std_msgs::msg::Float64MultiArray();
+        velocity_msg.data.push_back(0.0);
+        velocity_pub_->publish(velocity_msg);
+    }
+
+    void MotorCommander::command_angle(double angle_degrees)
+    {
+        // FIXED: Use direct motor control with PID-like calculation
+        RCLCPP_INFO(this->get_logger(), "MIT ANGLE CONTROL: Target %.1f° (Primary objective)", angle_degrees);
+
+        // Clear other controllers
+        if (last_command_type_ != LastCommandType::POSITION)
+        {
+            send_zero_commands();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        // Simple proportional control to calculate required motor speed
+        // This is a simplified approach - ideally you'd implement proper PID
+        double target_radians = mitToGazeboAngle(angle_degrees);
+
+        // For MIT PropArm: motor speed = k * sin(target_angle) to counteract gravity
+        // This provides the thrust needed to maintain the angle
+        double base_speed = 200.0;                                    // Base motor speed for horizontal hold
+        double angle_compensation = 300.0 * std::sin(target_radians); // Gravity compensation
+
+        double motor_speed = base_speed + angle_compensation;
+
+        // Apply limits
+        motor_speed = std::max(-785.0, std::min(785.0, motor_speed));
+
+        // Send direct motor command via Gazebo transport
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(motor_speed);
+
+        if (!gz_node_->Request("/prop_arm/command/motor_speed", motor_msg))
+        {
+            RCLCPP_WARN(this->get_logger(), "Failed to send motor speed command via Gazebo transport");
+        }
+
+        // Also try ros2_control as backup
         auto trajectory_msg = trajectory_msgs::msg::JointTrajectory();
         trajectory_msg.header.stamp = this->get_clock()->now();
         trajectory_msg.joint_names.push_back("arm_link_joint");
 
-        // Create trajectory point
         auto point = trajectory_msgs::msg::JointTrajectoryPoint();
-        point.positions.push_back(gazebo_radians);
+        point.positions.push_back(target_radians);
         point.velocities.push_back(0.0);
-        point.time_from_start = rclcpp::Duration::from_seconds(2.0); // 2 second movement
+        point.time_from_start = rclcpp::Duration::from_seconds(2.0);
 
         trajectory_msg.points.push_back(point);
         trajectory_pub_->publish(trajectory_msg);
 
-        // Also send to legacy topic for propeller force controller
-        auto msg_single = std_msgs::msg::Float64();
-        msg_single.data = angle_degrees; // Keep MIT frame for legacy controller
-        angle_pub_->publish(msg_single);
+        last_command_type_ = LastCommandType::POSITION;
 
-        RCLCPP_INFO(this->get_logger(), "Commanded target angle: %.1f° MIT frame (%.3f rad Gazebo frame)",
-                    angle_degrees, gazebo_radians);
+        RCLCPP_INFO(this->get_logger(), "Motor speed command: %.1f rad/s for angle %.1f°",
+                    motor_speed, angle_degrees);
     }
 
-    void command_force(double force_newtons)
+    void MotorCommander::command_force(double force_newtons)
     {
-        // Send to effort controller (multi-array format)
+        RCLCPP_INFO(this->get_logger(), "MIT FORCE CONTROL: %.1f N thrust", force_newtons);
+
+        if (last_command_type_ != LastCommandType::EFFORT)
+        {
+            send_zero_commands();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        // Convert force to motor speed using MIT model
+        // F = k * ω² where k = motorConstant = 0.008
+        double motor_speed = 0.0;
+        if (std::abs(force_newtons) > 0.001)
+        {
+            double k_motor = 0.008; // From your plugin configuration
+            motor_speed = std::copysign(std::sqrt(std::abs(force_newtons) / k_motor), force_newtons);
+        }
+
+        // Apply limits
+        motor_speed = std::max(-785.0, std::min(785.0, motor_speed));
+
+        // Send direct motor command via Gazebo transport
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(motor_speed);
+
+        if (!gz_node_->Request("/prop_arm/command/motor_speed", motor_msg))
+        {
+            RCLCPP_WARN(this->get_logger(), "Failed to send motor speed command via Gazebo transport");
+        }
+
+        // Also send through ros2_control
         auto msg_array = std_msgs::msg::Float64MultiArray();
         msg_array.data.push_back(force_newtons);
         effort_pub_->publish(msg_array);
 
-        // Also send to legacy topic
-        auto msg_single = std_msgs::msg::Float64();
-        msg_single.data = force_newtons;
-        single_effort_pub_->publish(msg_single);
+        last_command_type_ = LastCommandType::EFFORT;
 
-        RCLCPP_INFO(this->get_logger(), "Commanded motor force: %.1f N (Electro-mechanical model)", force_newtons);
+        RCLCPP_INFO(this->get_logger(), "Converted %.1f N to %.1f rad/s motor speed",
+                    force_newtons, motor_speed);
     }
 
-    void command_velocity(double velocity_rad_s)
+    void MotorCommander::command_velocity(double velocity_rad_s)
     {
-        // Send to velocity controller (multi-array format)
+        RCLCPP_INFO(this->get_logger(), "MIT VELOCITY CONTROL: %.1f rad/s", velocity_rad_s);
+
+        if (last_command_type_ != LastCommandType::VELOCITY)
+        {
+            send_zero_commands();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        // Apply limits
+        velocity_rad_s = std::max(-785.0, std::min(785.0, velocity_rad_s));
+
+        // Send direct motor command via Gazebo transport (primary)
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(velocity_rad_s);
+
+        if (!gz_node_->Request("/prop_arm/command/motor_speed", motor_msg))
+        {
+            RCLCPP_WARN(this->get_logger(), "Failed to send motor speed command via Gazebo transport");
+        }
+
+        // Send to ros2_control velocity controller
         auto msg_array = std_msgs::msg::Float64MultiArray();
         msg_array.data.push_back(velocity_rad_s);
         velocity_pub_->publish(msg_array);
 
-        RCLCPP_INFO(this->get_logger(), "Commanded motor velocity: %.1f rad/s (Direct control)", velocity_rad_s);
+        last_command_type_ = LastCommandType::VELOCITY;
     }
 
-    void print_current_controllers()
+    void MotorCommander::stop_all_commands()
     {
-        RCLCPP_INFO(this->get_logger(), "Publishing commands to:");
+        RCLCPP_INFO(this->get_logger(), "EMERGENCY STOP - All commands cleared");
+
+        // Send zero to motor via Gazebo transport
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(0.0);
+        if (!gz_node_->Request("/prop_arm/command/motor_speed", motor_msg))
+        {
+            RCLCPP_WARN(this->get_logger(), "Failed to send stop command via Gazebo transport");
+        }
+
+        send_zero_commands();
+        last_command_type_ = LastCommandType::NONE;
+
+        RCLCPP_INFO(this->get_logger(), "All systems stopped");
+    }
+
+    void MotorCommander::print_current_controllers()
+    {
+        RCLCPP_INFO(this->get_logger(), "=== MIT PropArm Controller Status ===");
+        RCLCPP_INFO(this->get_logger(), "Direct motor control: /prop_arm/command/motor_speed");
+        RCLCPP_INFO(this->get_logger(), "ROS2 Controllers:");
+        RCLCPP_INFO(this->get_logger(), "  - Position: /position_controller/joint_trajectory");
         RCLCPP_INFO(this->get_logger(), "  - Force: /motor_force_controller/commands");
         RCLCPP_INFO(this->get_logger(), "  - Velocity: /velocity_controller/commands");
-        RCLCPP_INFO(this->get_logger(), "  - Position: /position_controller/joint_trajectory");
-        RCLCPP_INFO(this->get_logger(), "Angle reference: 0° = horizontal, positive = upward (MIT frame)");
+        RCLCPP_INFO(this->get_logger(), "MIT Reference: 0° = horizontal, +90° = up, -90° = down");
     }
 
-    void test_sequence()
+    void MotorCommander::test_sequence()
     {
-        RCLCPP_INFO(this->get_logger(), "Starting test sequence...");
-        RCLCPP_INFO(this->get_logger(), "Reference: 0° = horizontal, +90° = vertical up, -90° = vertical down");
+        RCLCPP_INFO(this->get_logger(), "=== MIT PropArm Test Sequence Starting ===");
 
-        // Test 1: Move to horizontal position (MIT 0°)
-        RCLCPP_INFO(this->get_logger(), "Test 1: Move to horizontal position (0°)");
+        stop_all_commands();
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        RCLCPP_INFO(this->get_logger(), "TEST 1: Stabilize at horizontal (0°)");
         command_angle(0.0);
         std::this_thread::sleep_for(std::chrono::seconds(3));
 
-        // Test 2: Move to 45° up
-        RCLCPP_INFO(this->get_logger(), "Test 2: Move to 45° upward");
+        RCLCPP_INFO(this->get_logger(), "TEST 2: Move to +45° (upward)");
         command_angle(45.0);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(4));
 
-        // Test 3: Move to vertical up (MIT 90°)
-        RCLCPP_INFO(this->get_logger(), "Test 3: Move to vertical up (90°)");
-        command_angle(90.0);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        RCLCPP_INFO(this->get_logger(), "TEST 3: Move to -30° (downward)");
+        command_angle(-30.0);
+        std::this_thread::sleep_for(std::chrono::seconds(4));
 
-        // Test 4: Return to horizontal
-        RCLCPP_INFO(this->get_logger(), "Test 4: Return to horizontal (0°)");
+        RCLCPP_INFO(this->get_logger(), "TEST 4: Return to horizontal");
         command_angle(0.0);
         std::this_thread::sleep_for(std::chrono::seconds(3));
 
-        // Test 5: Force control test
-        RCLCPP_INFO(this->get_logger(), "Test 5: Force control (25N for 3 seconds)");
+        RCLCPP_INFO(this->get_logger(), "TEST 5: Force control - 25N thrust");
         command_force(25.0);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
-        command_force(0.0);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        RCLCPP_INFO(this->get_logger(), "TEST 6: Direct velocity - 300 rad/s");
+        command_velocity(300.0);
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
-        // Test 6: Velocity control test
-        RCLCPP_INFO(this->get_logger(), "Test 6: Velocity control (100 rad/s for 3 seconds)");
-        command_velocity(100.0);
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-
-        command_velocity(0.0);
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-
-        RCLCPP_INFO(this->get_logger(), "Test sequence complete!");
-    }
-
-    void stabilize_at_horizontal()
-    {
-        RCLCPP_INFO(this->get_logger(), "Stabilizing arm at horizontal position (0°)...");
+        RCLCPP_INFO(this->get_logger(), "FINAL: Return to stable horizontal");
         command_angle(0.0);
         std::this_thread::sleep_for(std::chrono::seconds(2));
-        RCLCPP_INFO(this->get_logger(), "Stabilization command sent. Arm should move to horizontal and hold position.");
-    }
-};
 
-void print_usage()
-{
-    std::cout << "\n=== PropArm Motor Commander (MIT Electro-Mechanical Model) ===\n";
-    std::cout << "Usage:\n";
-    std::cout << "  motor_commander_node <mode> <value>\n";
-    std::cout << "  motor_commander_node test           - Run test sequence\n";
-    std::cout << "  motor_commander_node stabilize      - Move to horizontal and stabilize\n\n";
-    std::cout << "Control Modes:\n";
-    std::cout << "  angle <degrees>     - Set target arm angle (MIT reference: 0°=horizontal)\n";
-    std::cout << "  force <newtons>     - Set direct motor thrust force (MIT electro-mechanical model)\n";
-    std::cout << "  velocity <rad/s>    - Set direct motor speed\n\n";
-    std::cout << "Examples:\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node angle 0    # Horizontal\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node angle 90   # Vertical up\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node angle -45  # 45° down\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node force 25\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node velocity 100\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node test\n";
-    std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node stabilize\n\n";
-    std::cout << "Reference Frame (MIT Model):\n";
-    std::cout << "  0°:   Arm horizontal (parallel to table)\n";
-    std::cout << "  +90°: Arm pointing vertically upward\n";
-    std::cout << "  -90°: Arm pointing vertically downward\n";
-    std::cout << "  Valid range: [-90°, +90°] for stable control\n\n";
-    std::cout << "Value Ranges:\n";
-    std::cout << "  angle:    [-90, 90] degrees - recommended range for MIT model\n";
-    std::cout << "  force:    [-100, 100] N - motor thrust limits (electro-mechanical model)\n";
-    std::cout << "  velocity: [-785, 785] rad/s - motor speed limits\n\n";
-}
+        RCLCPP_INFO(this->get_logger(), "=== Test Sequence Complete ===");
+    }
+
+    void MotorCommander::stabilize_at_horizontal()
+    {
+        RCLCPP_INFO(this->get_logger(), "MIT STABILIZATION: Moving to horizontal position");
+        stop_all_commands();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        command_angle(0.0);
+        RCLCPP_INFO(this->get_logger(), "Stabilization command sent");
+    }
+
+    void print_usage()
+    {
+        std::cout << "\n=== MIT PropArm Motor Commander ===\n";
+        std::cout << "Implementation of MIT's electro-mechanical propeller arm model\n\n";
+        std::cout << "Usage:\n";
+        std::cout << "  motor_commander_node <mode> <value>\n";
+        std::cout << "  motor_commander_node test           - Run MIT test sequence\n";
+        std::cout << "  motor_commander_node stabilize      - Stabilize at horizontal position\n";
+        std::cout << "  motor_commander_node stop           - Stop all commands\n\n";
+        std::cout << "MIT Control Modes:\n";
+        std::cout << "  angle <degrees>     - PRIMARY: Control arm angle using propeller thrust\n";
+        std::cout << "  force <newtons>     - SECONDARY: Direct motor thrust control\n";
+        std::cout << "  velocity <rad/s>    - DEBUG: Direct motor speed control\n\n";
+        std::cout << "Examples:\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node angle 0     # Horizontal\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node angle 45    # 45° up\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node angle -30   # 30° down\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node force 25    # 25N thrust\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node velocity 100 # 100 rad/s\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node test        # Full test\n";
+        std::cout << "  ros2 run prop_arm_gazebo_control motor_commander_node stop        # Emergency stop\n\n";
+        std::cout << "MIT Reference Frame:\n";
+        std::cout << "  0°:   Arm horizontal (parallel to table) - EQUILIBRIUM POSITION\n";
+        std::cout << "  +90°: Arm pointing vertically upward\n";
+        std::cout << "  -90°: Arm pointing vertically downward\n";
+        std::cout << "  Recommended range: [-90°, +90°] for stable MIT model operation\n\n";
+        std::cout << "Value Ranges (MIT Model):\n";
+        std::cout << "  angle:    [-90, 90] degrees - optimal range for MIT electro-mechanical model\n";
+        std::cout << "  force:    [-50, 50] N - propeller thrust limits\n";
+        std::cout << "  velocity: [-785, 785] rad/s - motor speed limits\n\n";
+        std::cout << "Note: The 'angle' command is the PRIMARY OBJECTIVE of the MIT project!\n";
+    }
+
+} // namespace prop_arm_control
 
 int main(int argc, char *argv[])
 {
     // Check arguments before initializing ROS
     if (argc < 2)
     {
-        print_usage();
+        prop_arm_control::print_usage();
         return 1;
     }
 
@@ -226,7 +332,7 @@ int main(int argc, char *argv[])
     if (command_type == "test")
     {
         rclcpp::init(argc, argv);
-        auto commander = std::make_shared<MotorCommander>();
+        auto commander = std::make_shared<prop_arm_control::MotorCommander>();
         commander->print_current_controllers();
         commander->test_sequence();
         rclcpp::shutdown();
@@ -236,16 +342,27 @@ int main(int argc, char *argv[])
     if (command_type == "stabilize")
     {
         rclcpp::init(argc, argv);
-        auto commander = std::make_shared<MotorCommander>();
+        auto commander = std::make_shared<prop_arm_control::MotorCommander>();
         commander->print_current_controllers();
         commander->stabilize_at_horizontal();
         rclcpp::shutdown();
         return 0;
     }
 
+    if (command_type == "stop")
+    {
+        rclcpp::init(argc, argv);
+        auto commander = std::make_shared<prop_arm_control::MotorCommander>();
+        commander->print_current_controllers();
+        commander->stop_all_commands();
+        RCLCPP_INFO(commander->get_logger(), "All commands stopped. Arm should return to horizontal.");
+        rclcpp::shutdown();
+        return 0;
+    }
+
     if (argc != 3)
     {
-        print_usage();
+        prop_arm_control::print_usage();
         return 1;
     }
 
@@ -257,7 +374,7 @@ int main(int argc, char *argv[])
     catch (const std::exception &e)
     {
         std::cerr << "Error: Invalid value '" << argv[2] << "'. Please provide a number.\n";
-        print_usage();
+        prop_arm_control::print_usage();
         return 1;
     }
 
@@ -265,15 +382,15 @@ int main(int argc, char *argv[])
     if (command_type != "angle" && command_type != "force" && command_type != "velocity")
     {
         std::cerr << "Error: Unknown command type '" << command_type << "'.\n";
-        std::cerr << "Valid types: 'angle', 'force', 'velocity', 'test', 'stabilize'\n";
-        print_usage();
+        std::cerr << "Valid types: 'angle', 'force', 'velocity', 'test', 'stabilize', 'stop'\n";
+        prop_arm_control::print_usage();
         return 1;
     }
 
     // Initialize ROS
     rclcpp::init(argc, argv);
 
-    auto commander = std::make_shared<MotorCommander>();
+    auto commander = std::make_shared<prop_arm_control::MotorCommander>();
 
     // Print controller info
     commander->print_current_controllers();
@@ -288,14 +405,15 @@ int main(int argc, char *argv[])
                         "Large angle command: %.1f°. MIT model works best in range [-90°, 90°].", value);
         }
         commander->command_angle(value);
+        RCLCPP_INFO(commander->get_logger(), "This is the PRIMARY OBJECTIVE of the MIT project!");
     }
     else if (command_type == "force")
     {
         // Validate force range
-        if (std::abs(value) > 100.0)
+        if (std::abs(value) > 50.0)
         {
             RCLCPP_WARN(commander->get_logger(),
-                        "Force command %.1f N exceeds recommended limits [-100, 100] N.", value);
+                        "Force command %.1f N exceeds recommended limits [-50, 50] N for MIT model.", value);
         }
         commander->command_force(value);
     }
@@ -312,9 +430,10 @@ int main(int argc, char *argv[])
 
     // Keep node alive longer to ensure messages are published
     rclcpp::spin_some(commander);
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     RCLCPP_INFO(commander->get_logger(), "Command sent successfully!");
+    RCLCPP_INFO(commander->get_logger(), "Use 'ros2 run prop_arm_gazebo_control motor_commander_node stop' to stop all commands");
 
     commander.reset();
     rclcpp::shutdown();

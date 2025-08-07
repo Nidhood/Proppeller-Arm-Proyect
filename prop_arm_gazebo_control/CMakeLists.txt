@@ -76,6 +76,12 @@ add_executable(motor_commander_node
     src/motor_commander.cpp
 )
 
+# FIXED: Link Gazebo libraries properly
+target_link_libraries(motor_commander_node
+    gz-transport13::gz-transport13
+    gz-msgs10::gz-msgs10
+)
+
 ament_target_dependencies(motor_commander_node
     rclcpp
     std_msgs
