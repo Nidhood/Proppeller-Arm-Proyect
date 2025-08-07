@@ -27,12 +27,6 @@ namespace sim = gz::sim;
 
 namespace prop_arm_gazebo_control
 {
-    /**
-     * @brief Structure to hold joint data based on the MIT electro-mechanical model
-     *
-     * Contains all the state and command variables for a single joint,
-     * following MIT's reference frame where 0° = horizontal position.
-     */
     struct JointData
     {
         // State variables (read from simulation)
@@ -48,13 +42,6 @@ namespace prop_arm_gazebo_control
         // Gazebo simulation entity
         sim::Entity sim_joint = sim::kNullEntity;
     };
-
-    /**
-     * @brief PID Controller for position control (MIT primary objective)
-     *
-     * Implements PID control for precise angle control using propeller thrust.
-     * This is the main control mode for the MIT PropArm project.
-     */
     struct PIDController
     {
         // PID gains - tuned for MIT PropArm dynamics
@@ -70,13 +57,6 @@ namespace prop_arm_gazebo_control
         double output_min = -785.0; ///< Maximum motor speed (reverse direction)
         double output_max = 785.0;  ///< Maximum motor speed (forward direction)
     };
-
-    /**
-     * @brief Electro-mechanical model parameters based on MIT PropArm specifications
-     *
-     * Contains all the physical parameters for the MIT PropArm system,
-     * implementing the electro-mechanical coupling between motor and arm.
-     */
     struct ModelParameters
     {
         // System inertias (kg·m²)
@@ -100,18 +80,6 @@ namespace prop_arm_gazebo_control
         double force_to_velocity_gain = 5.0; ///< Converts force commands to velocity
     };
 
-    /**
-     * @brief Hardware interface for MIT PropArm in Gazebo simulation
-     *
-     * Implements the ros2_control hardware interface for the MIT PropArm project.
-     * Inherits from GazeboSimSystemInterface to integrate with Gazebo simulation.
-     *
-     * Key features:
-     * - MIT reference frame: 0° = horizontal, +90° = up, -90° = down
-     * - Multiple control modes: position (primary), velocity, force/effort
-     * - Electro-mechanical model implementation
-     * - PID control for precise angle positioning
-     */
     class PropArmHardware : public gz_ros2_control::GazeboSimSystemInterface
     {
     public:
@@ -171,26 +139,10 @@ namespace prop_arm_gazebo_control
         std::vector<hardware_interface::StateInterface> state_interfaces_;
         std::vector<hardware_interface::CommandInterface> command_interfaces_;
 
-        /**
-         * @brief Convert MIT reference frame angle to Gazebo joint frame
-         * @param mit_angle Angle in MIT frame (radians, 0=horizontal)
-         * @return Angle in Gazebo joint frame (radians)
-         */
         double mitToGazeboAngle(double mit_angle) const;
 
-        /**
-         * @brief Convert Gazebo joint frame angle to MIT reference frame
-         * @param gazebo_angle Angle in Gazebo joint frame (radians)
-         * @return Angle in MIT frame (radians, 0=horizontal)
-         */
-        double gazeboToMitAngle(double gazebo_angle) const;
+        gazeboToMitAngle(double gazebo_angle) const;
 
-        /**
-         * @brief Update the MIT electro-mechanical model simulation
-         * @param joint_name Name of the joint to update
-         * @param motor_speed_cmd Motor speed command (rad/s)
-         * @param dt Time step for integration (seconds)
-         */
         void updateElectroMechanicalModel(const std::string &joint_name,
                                           double motor_speed_cmd,
                                           double dt);

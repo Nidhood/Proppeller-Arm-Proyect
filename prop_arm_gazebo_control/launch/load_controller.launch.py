@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+
+# -------------------------- LAUNCH DEPENDENCIES -------------------------
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 
+# ---------------------- LAUNCH DESCRIPTION ----------------------
 def generate_launch_description():
     
     # Allow use_sim_time:

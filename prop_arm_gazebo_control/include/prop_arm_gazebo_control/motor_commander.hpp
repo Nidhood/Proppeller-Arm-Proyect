@@ -44,17 +44,12 @@ namespace prop_arm_control
             VELOCITY,
             EFFORT
         };
-
-        // FIXED: Use Gazebo transport node instead of ROS publisher for Gazebo messages
         std::unique_ptr<gz::transport::Node> gz_node_;
 
         // Publishers for different controller types (ROS messages only)
         rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr effort_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr velocity_pub_;
         rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr trajectory_pub_;
-
-        // REMOVED: Direct motor speed publisher (replaced with Gazebo transport)
-        // rclcpp::Publisher<gz::msgs::Actuators>::SharedPtr motor_speed_pub_;
 
         // Timer for cleanup to prevent sticky behavior
         rclcpp::TimerBase::SharedPtr cleanup_timer_;
