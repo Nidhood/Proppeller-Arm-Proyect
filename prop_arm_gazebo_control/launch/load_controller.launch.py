@@ -33,8 +33,24 @@ def generate_launch_description():
                 output='screen',
             )]
         ),
+        
+        # 2. Spawn position_controller:
+        TimerAction(
+            period=8.0,
+            actions=[Node(
+                package='controller_manager',
+                executable='spawner',
+                name='spawner_position_controller',
+                arguments=[
+                    'position_controller',
+                    '--controller-manager', '/controller_manager'
+                ],
+                parameters=[{'use_sim_time': use_sim_time}],
+                output='screen',
+            )]
+        ),
 
-        # 2. Spawn motor_force_controller:
+        # 3. Spawn motor_force_controller:
         TimerAction(
             period=4.0,
             actions=[Node(
@@ -50,7 +66,7 @@ def generate_launch_description():
             )]
         ),
 
-        # 3. Spawn velocity_controller:
+        # 4. Spawn velocity_controller:
         TimerAction(
             period=6.0,
             actions=[Node(
@@ -59,22 +75,6 @@ def generate_launch_description():
                 name='spawner_velocity_controller',
                 arguments=[
                     'velocity_controller',
-                    '--controller-manager', '/controller_manager'
-                ],
-                parameters=[{'use_sim_time': use_sim_time}],
-                output='screen',
-            )]
-        ),
-
-        # 4. Spawn position_controller:
-        TimerAction(
-            period=8.0,
-            actions=[Node(
-                package='controller_manager',
-                executable='spawner',
-                name='spawner_position_controller',
-                arguments=[
-                    'position_controller',
                     '--controller-manager', '/controller_manager'
                 ],
                 parameters=[{'use_sim_time': use_sim_time}],
