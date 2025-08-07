@@ -2,7 +2,7 @@
 <package format="3">
     <name>prop_arm_gazebo_control</name>
     <version>0.0.1</version>
-    <description>Control and hardware interface for the Prop Arm system using ros2_control</description>
+    <description>Control and hardware interface for the Prop Arm system using ros2_control with electro-mechanical model</description>
 
     <maintainer email="ivan.oroz34@gmail.com">Nidhood</maintainer>
     <license>BSD-3-Clause</license>
@@ -11,17 +11,42 @@
 
     <!-- Core dependencies -->
     <depend>rclcpp</depend>
+    <depend>rclcpp_lifecycle</depend>
     <depend>hardware_interface</depend>
     <depend>pluginlib</depend>
+
+    <!-- ROS2 Control dependencies -->
+    <depend>controller_interface</depend>
+    <depend>realtime_tools</depend>
+    <depend>control_msgs</depend>
+    <depend>trajectory_msgs</depend>
+
+    <!-- Standard ROS2 Controllers -->
+    <exec_depend>joint_state_broadcaster</exec_depend>
+    <exec_depend>effort_controllers</exec_depend>
+    <exec_depend>velocity_controllers</exec_depend>
+    <exec_depend>joint_trajectory_controller</exec_depend>
+    <exec_depend>controller_manager</exec_depend>
+
+    <!-- Message dependencies -->
+    <depend>std_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>geometry_msgs</depend>
+    <depend>rosgraph_msgs</depend>
 
     <!-- Gazebo dependencies -->
     <depend>gz-transport13</depend>
     <depend>gz-msgs10</depend>
+    <depend>gz-sim8</depend>
 
-    <!-- Optional Gazebo integration -->
+    <!-- ROS-Gazebo bridge -->
+    <exec_depend>ros_gz_bridge</exec_depend>
     <exec_depend>gz_ros2_control</exec_depend>
 
-    <!-- Testing -->
+    <!-- Launch and configuration -->
+    <exec_depend>launch_ros</exec_depend>
+    <exec_depend>xacro</exec_depend>
+
     <!-- Testing -->
     <test_depend>ament_lint_auto</test_depend>
     <test_depend>ament_lint_common</test_depend>

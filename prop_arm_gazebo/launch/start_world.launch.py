@@ -12,6 +12,7 @@ from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory, get_package_prefix
 
+# ---------------------- LAUNCH DESCRIPTION ----------------------
 def generate_launch_description():
 
     # Launch Arguments

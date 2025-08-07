@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# ---------------------------- PYTHON IMPORTS ----------------------------
-import random
-
 # -------------------------- LAUNCH DEPENDENCIES -------------------------
 from launch_ros.actions import Node
 from launch import LaunchDescription

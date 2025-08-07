@@ -34,9 +34,9 @@
       </geometry>
     </collision>
     <inertial>
-      <inertia ixx="0.45780" ixy="-0.00003" ixz="-0.00533" iyy="0.45909" iyz="-0.00314" izz="0.00510"/>
+      <inertia ixx="0.9156" ixy="-0.00006" ixz="-0.01066" iyy="0.91818" iyz="-0.00628" izz="0.01020"/>
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.14437 -0.00020 0.01985"/>
-      <mass value="10.00000"/>
+      <mass value="20.0"/>  
     </inertial>
     <visual name="arm">
       <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 -0.00000 -0.00000"/>
@@ -95,11 +95,11 @@
   </joint>
 
   <!-- Joint between base and arm -->
-  <joint name="arm_link_joint" type="continuous"> 
+  <joint name="arm_link_joint" type="revolute"> 
     <axis xyz="0 0 -1"/>
     <origin rpy="0 1.57080 0" xyz="0.43129 -0.58144 0.11764"/>
-    <limit effort="1500.0" velocity="10.0"/>
-    <dynamics damping="0.8" friction="0.3"/>
+    <limit lower="1.5708" upper="3.14159" effort="1500.0" velocity="10.0"/>
+    <dynamics damping="0.0" friction="0.0"/>
     <parent link="base_link"/>
     <child link="arm_link"/>
   </joint>

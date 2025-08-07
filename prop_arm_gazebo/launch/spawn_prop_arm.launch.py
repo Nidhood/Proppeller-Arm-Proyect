@@ -1,70 +1,80 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# -------------------------- LAUNCH DEPENDENCIES -------------------------
+
+# ---------------------------- PYTHON IMPORTS ----------------------------
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction, DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.actions import Node
 
 # ---------------------- LAUNCH DESCRIPTION ----------------------
 def generate_launch_description():
-    # Argumento para use_sim_time
+    
+    # allow sim‐time
     use_sim_time_arg = DeclareLaunchArgument(
-        'use_sim_time',
-        default_value='true',
-        description='Use simulation time'
+        'use_sim_time', default_value='true',
+        description='Use simulation (Gazebo) clock'
     )
-    
     use_sim_time = LaunchConfiguration('use_sim_time')
-    
-    # Paths to included launch files
-    gazebo_launch = PathJoinSubstitution([
-        FindPackageShare("prop_arm_gazebo"), "launch", "start_world.launch.py"
-    ])
-    urdf_launch = PathJoinSubstitution([
-        FindPackageShare("prop_arm_description"), "launch", "publish_urdf.launch.py"
-    ])
-    spawn_launch = PathJoinSubstitution([
-        FindPackageShare("prop_arm_gazebo"), "launch", "spawn_prop_arm_description.launch.py"
-    ])
-    controller_launch = PathJoinSubstitution([
-        FindPackageShare("prop_arm_gazebo_control"), "launch", "load_controller.launch.py"
-    ])
+
+    # find your packages
+    pkg_gz   = FindPackageShare("prop_arm_gazebo")
+    pkg_desc = FindPackageShare("prop_arm_description")
+    pkg_ctrl = FindPackageShare("prop_arm_gazebo_control")
+
+    # launch files
+    gazebo_launch     = PathJoinSubstitution([pkg_gz,   "launch", "start_world.launch.py"])
+    urdf_launch       = PathJoinSubstitution([pkg_desc, "launch", "publish_urdf.launch.py"])
+    spawn_launch      = PathJoinSubstitution([pkg_gz,   "launch", "spawn_prop_arm_description.launch.py"])
+    controller_launch = PathJoinSubstitution([pkg_ctrl, "launch", "load_controller.launch.py"])
 
     return LaunchDescription([
         use_sim_time_arg,
-        
-        # Launch Gazebo first
+
+        # 1. Start Gazebo:
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch),
             launch_arguments={'use_sim_time': use_sim_time}.items()
         ),
-        
-        # Publish URDF (robot_description)
+
+        # 2. Bridge /clock from Gazebo:
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            name='clock_bridge',
+            arguments=[
+                '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock'
+            ],
+            parameters=[{ 'use_sim_time': use_sim_time }],
+            output='screen',
+        ),
+
+        # 3. Publish URDF:
         TimerAction(
-            period=2.0,
-            actions=[IncludeLaunchDescription(
+            period=1.0,
+            actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(urdf_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
-            )]
+            ) ]
         ),
-        
-        # Spawn the robot model in Gazebo
+
+        # 4. Spawn the robot in Gazebo:
         TimerAction(
-            period=4.0,
-            actions=[IncludeLaunchDescription(
+            period=3.0,
+            actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(spawn_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
-            )]
+            ) ]
         ),
-        
-        # Load the controller
+
+        # 5. Load controllers:
         TimerAction(
             period=6.0,
-            actions=[IncludeLaunchDescription(
+            actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(controller_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
-            )]
+            ) ]
         ),
     ])

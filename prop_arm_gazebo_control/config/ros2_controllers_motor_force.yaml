@@ -1,0 +1,55 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+    use_sim_time: true
+
+    # Define all available controllers:
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    # Force/Effort controller for direct thrust control:
+    motor_force_controller:
+      type: effort_controllers/JointGroupEffortController
+
+    # Velocity controller for direct velocity control
+    velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    # Position controller using JointTrajectoryController instead:
+    position_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# Configure the joint state broadcaster:
+joint_state_broadcaster:
+  ros__parameters:
+    use_sim_time: true
+    joints: [arm_link_joint]
+    interfaces: [position, velocity, effort]
+
+# Configure the force/effort controller for motor thrust:
+motor_force_controller:
+  ros__parameters:
+    use_sim_time: true
+    joints: [arm_link_joint]
+    command_interfaces: [effort]
+
+# Configure the velocity controller for direct motor speed:
+velocity_controller:
+  ros__parameters:
+    use_sim_time: true
+    joints: [arm_link_joint]
+    command_interfaces: [velocity]
+
+# Configure the position controller for angle control using JointTrajectoryController:
+position_controller:
+  ros__parameters:
+    use_sim_time: true
+    joints: [arm_link_joint]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    allow_partial_joints_goal: true
+    constraints:
+      stopped_velocity_tolerance: 0.05
+      goal_time: 0.0
+    state_publish_rate: 100.0
+    action_monitor_rate: 20.0
