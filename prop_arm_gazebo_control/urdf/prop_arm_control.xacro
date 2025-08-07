@@ -1,10 +1,12 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="prop_arm_control">
 
-    <!-- Gazebo plugin para ros2_control -->
+    <!-- Gazebo plugin for ros2_control -->
     <gazebo>
-        <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="libgz_ros2_control-system.so">
-            <parameters>$(find prop_arm_gazebo_control)/config/ros2_controllers.yaml</parameters>
+        <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+            <parameters>$(find prop_arm_gazebo_control)/config/ros2_controllers_motor_force.yaml</parameters>
+            <robot_param>robot_description</robot_param>
+            <robot_param_node>robot_state_publisher</robot_param_node>
         </plugin>
     </gazebo>
 
@@ -14,13 +16,33 @@
             <plugin>prop_arm_gazebo_control/PropArmHardware</plugin>
             <param name="robot_namespace">prop_arm</param>
         </hardware>
+        
+        <!-- Define the joint that will be controlled -->
         <joint name="arm_link_joint">
-            <command_interface name="position">
-                <param name="min">-6.28</param>
-                <param name="max">6.28</param>
+    
+            <!-- Command interface for direct force/thrust control -->
+            <command_interface name="effort">
+                <param name="min">-100.0</param>
+                <param name="max">100.0</param>
             </command_interface>
+            
+            <!-- Command interface for direct velocity control -->
+            <command_interface name="velocity">
+                <param name="min">-785.0</param>
+                <param name="max">785.0</param>
+            </command_interface>
+            
+            <!-- Command interface for position control (angle control) -->
+            <command_interface name="position">
+                <param name="min">-3.14159</param>
+                <param name="max">3.14159</param>
+            </command_interface>
+            
+            <!-- State interfaces -->
             <state_interface name="position"/>
             <state_interface name="velocity"/>
+            <state_interface name="effort"/>
         </joint>
     </ros2_control>
+
 </robot>

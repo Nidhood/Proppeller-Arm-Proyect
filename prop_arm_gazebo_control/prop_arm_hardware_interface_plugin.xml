@@ -1,7 +1,7 @@
 <library path="libprop_arm_hardware_interface">
-    <class name="prop_arm_gazebo_control/PropArmHardware" type="prop_arm_gazebo_control::PropArmHardware" base_class_type="hardware_interface::SystemInterface">
+    <class name="prop_arm_gazebo_control/PropArmHardware" type="prop_arm_gazebo_control::PropArmHardware" base_class_type="gz_ros2_control::GazeboSimSystemInterface">
         <description>
-            PropArm Hardware Interface personalizada
+            PropArm Hardware Interface compatible with gz_ros2_control
         </description>
     </class>
 </library>
