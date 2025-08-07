@@ -20,7 +20,7 @@ def generate_launch_description():
 
         # 1. Spawn joint_state_broadcaster:
         TimerAction(
-            period=2.0,  # Reducido el tiempo inicial
+            period=2.0,  
             actions=[Node(
                 package='controller_manager',
                 executable='spawner',
