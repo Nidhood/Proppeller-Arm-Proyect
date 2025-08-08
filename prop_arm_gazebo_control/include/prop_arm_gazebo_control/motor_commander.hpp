@@ -44,15 +44,13 @@ namespace prop_arm_control
             VELOCITY,
             EFFORT
         };
+        
         std::unique_ptr<gz::transport::Node> gz_node_;
 
-        // Publishers for different controller types (ROS messages only)
+        // Publishers for different controller types
         rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr effort_pub_;
         rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr velocity_pub_;
         rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr trajectory_pub_;
-
-        // Timer for cleanup to prevent sticky behavior
-        rclcpp::TimerBase::SharedPtr cleanup_timer_;
 
         // State tracking
         LastCommandType last_command_type_;
@@ -60,6 +58,9 @@ namespace prop_arm_control
         // MIT reference frame conversion methods
         double mitToGazeboAngle(double mit_angle_degrees) const;
         double gazeboToMitAngle(double gazebo_radians) const;
+
+        // Physics calculation methods
+        double calculateThrustForAngle(double target_angle_degrees);
 
         // Internal utility methods
         void send_zero_commands();

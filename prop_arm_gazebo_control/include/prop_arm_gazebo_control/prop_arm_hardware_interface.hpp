@@ -1,4 +1,5 @@
-#pragma once
+#ifndef PROP_ARM_HARDWARE_INTERFACE_HPP_
+#define PROP_ARM_HARDWARE_INTERFACE_HPP_
 
 #include <memory>
 #include <string>
@@ -27,69 +28,57 @@ namespace sim = gz::sim;
 
 namespace prop_arm_gazebo_control
 {
+    // Structure to hold joint data based on the electro-mechanical model:
     struct JointData
     {
-        // State variables (read from simulation)
-        double position = 0.0; ///< θ_a - arm angle in MIT frame (0=horizontal, +90=up, -90=down)
-        double velocity = 0.0; ///< ω_a - arm angular velocity (rad/s)
-        double effort = 0.0;   ///< Motor effort/torque (N·m)
+        double position = 0.0;         // θ_a - arm angle in MIT frame (0=horizontal).
+        double velocity = 0.0;         // ω_a - arm angular velocity.
+        double effort = 0.0;           // Motor effort/torque.
+        double position_command = 0.0; // Desired arm position in MIT frame (0=horizontal),
+        double velocity_command = 0.0; // Direct velocity command.
+        double effort_command = 0.0;   // Direct force/thrust command.
 
-        // Command variables (written by controllers)
-        double position_command = 0.0; ///< Desired arm position in MIT frame (rad)
-        double velocity_command = 0.0; ///< Direct velocity command (rad/s)
-        double effort_command = 0.0;   ///< Direct force/thrust command (N)
+        // Command tracking to fix "stuck" command issue
+        double last_position_command = 0.0;
+        double last_velocity_command = 0.0;
+        double last_effort_command = 0.0;
 
-        // Gazebo simulation entity
+        // Gazebo simulation entity:
         sim::Entity sim_joint = sim::kNullEntity;
     };
+
+    // PID Controller for position control
     struct PIDController
     {
-        // PID gains - tuned for MIT PropArm dynamics
-        double kp = 100.0; ///< Proportional gain for position error
-        double ki = 5.0;   ///< Integral gain for steady-state error elimination
-        double kd = 15.0;  ///< Derivative gain for damping oscillations
-
-        // PID state variables
-        double integral = 0.0;   ///< Accumulated integral term
-        double prev_error = 0.0; ///< Previous error for derivative calculation
-
-        // Output limits (motor speed constraints)
-        double output_min = -785.0; ///< Maximum motor speed (reverse direction)
-        double output_max = 785.0;  ///< Maximum motor speed (forward direction)
+        double kp = 50.0;           // Proportional gain.
+        double ki = 0.1;            // Small integral gain.
+        double kd = 5.0;            // Derivative gain for damping.
+        double integral = 0.0;      // Integral term for anti-windup.
+        double prev_error = 0.0;    // Previous error for derivative calculation.
+        double output_min = -785.0; // Max motor speed (negative).
+        double output_max = 785.0;  // Max motor speed (positive).
     };
+
+    // Electro-mechanical model parameters based on MIT model:
     struct ModelParameters
     {
-        // System inertias (kg·m²)
-        double Ja = 0.05;  ///< Arm inertia - reduced for responsive control
-        double Jm = 0.001; ///< Motor inertia - small for propeller dynamics
-
-        // Motor electrical constants
-        double Kt = 0.05; ///< Motor torque constant (N·m/A)
-        double Ke = 0.05; ///< Motor EMF constant (V·s/rad)
-        double Rm = 2.0;  ///< Motor resistance (Ω)
-
-        // Mechanical friction and damping
-        double Ra = 0.05; ///< Arm resistance/damping coefficient (N·m·s/rad)
-        double Kf = 0.01; ///< Nonlinear friction coefficient (N·m·s²/rad²)
-
-        // Propeller model parameters (from SDF configuration)
-        double motorConstant = 0.008; ///< Motor thrust constant: F = k·ω² (N/(rad/s)²)
-        double momentConstant = 0.02; ///< Moment arm constant (m)
-
-        // Control conversion gains
-        double force_to_velocity_gain = 5.0; ///< Converts force commands to velocity
+        double Ja = 0.1;                      // Arm inertia.
+        double Jm = 0.01;                     // Motor inertia.
+        double Kt = 0.1;                      // Motor torque constant.
+        double Ke = 0.1;                      // Motor EMF constant.
+        double Rm = 1.0;                      // Motor resistance.
+        double Ra = 0.1;                      // Arm resistance/damping.
+        double Kf = 0.05;                     // Friction coefficient.
+        double force_to_velocity_gain = 10.0; // Converts force commands to velocity
     };
 
+    // Inherit from GazeboSimSystemInterface:
     class PropArmHardware : public gz_ros2_control::GazeboSimSystemInterface
     {
     public:
         RCLCPP_SHARED_PTR_DEFINITIONS(PropArmHardware)
 
-        // Constructor and destructor
-        PropArmHardware() = default;
-        virtual ~PropArmHardware() = default;
-
-        // gz_ros2_control::GazeboSimSystemInterface interface methods
+        // gz_ros2_control::GazeboSimSystemInterface methods:
         bool initSim(
             rclcpp::Node::SharedPtr &model_nh,
             std::map<std::string, sim::Entity> &joints,
@@ -97,7 +86,7 @@ namespace prop_arm_gazebo_control
             sim::EntityComponentManager &_ecm,
             unsigned int update_rate) override;
 
-        // hardware_interface::SystemInterface interface methods
+        // hardware_interface::SystemInterface methods:
         hardware_interface::CallbackReturn on_init(
             const hardware_interface::HardwareInfo &info) override;
 
@@ -118,34 +107,37 @@ namespace prop_arm_gazebo_control
             const rclcpp::Time &time, const rclcpp::Duration &period) override;
 
     private:
-        // Core data structures
+        // Hardware interface data:
         std::unordered_map<std::string, JointData> joints_;
         std::unordered_map<std::string, PIDController> pid_controllers_;
         ModelParameters model_params_;
 
-        // Gazebo simulation integration
+        // Gazebo simulation data:
         sim::EntityComponentManager *ecm_{nullptr};
         std::map<std::string, sim::Entity> enabled_joints_;
         unsigned int update_rate_{100};
         rclcpp::Node::SharedPtr nh_;
 
-        // Gazebo transport communication
+        // Gazebo communication:
         std::unique_ptr<gz::transport::Node> gz_node_;
         gz::transport::Node::Publisher actuators_pub_;
         std::string actuators_topic_;
         std::string robot_namespace_;
 
-        // Hardware interface storage
+        // State and command interfaces storage
         std::vector<hardware_interface::StateInterface> state_interfaces_;
         std::vector<hardware_interface::CommandInterface> command_interfaces_;
 
+        // Angle transformation methods
         double mitToGazeboAngle(double mit_angle) const;
+        double gazeboToMitAngle(double gazebo_angle) const;
 
-        gazeboToMitAngle(double gazebo_angle) const;
-
+        // Electro-mechanical model simulation
         void updateElectroMechanicalModel(const std::string &joint_name,
                                           double motor_speed_cmd,
                                           double dt);
     };
 
 } // namespace prop_arm_gazebo_control
+
+#endif // PROP_ARM_HARDWARE_INTERFACE_HPP_
