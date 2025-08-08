@@ -5,17 +5,18 @@ namespace prop_arm_control
 
     PropellerForceController::PropellerForceController() : Node("propeller_force_controller")
     {
-        RCLCPP_INFO(this->get_logger(), "Initializing Propeller Force Controller...");
+        RCLCPP_INFO(this->get_logger(), "Initializing Propeller Force Controller (POSITIVE THRUST ONLY)...");
 
-        // Declare and get parameters
-        this->declare_parameter("kp", 25.0); // Increased for better tracking
-        this->declare_parameter("ki", 1.0);  // Increased to eliminate steady-state error
-        this->declare_parameter("kd", 8.0);  // Increased for better damping
-        this->declare_parameter("max_motor_force", 75.0);
-        this->declare_parameter("min_motor_force", -75.0);
-        this->declare_parameter("control_frequency", 100.0);  // Increased for better control
-        this->declare_parameter("initial_target_angle", 0.0); // Start at horizontal
+        // Declare and get parameters optimized for positive thrust control
+        this->declare_parameter("kp", 40.0);  // Increased for better tracking with positive constraint
+        this->declare_parameter("ki", 1.5);   // Moderate to prevent windup
+        this->declare_parameter("kd", 20.0);  // Increased damping for stability
+        this->declare_parameter("max_motor_force", 45.0);  // Reduced maximum for stability
+        this->declare_parameter("min_motor_force", 0.0);   // CRITICAL: No negative thrust
+        this->declare_parameter("control_frequency", 100.0); 
+        this->declare_parameter("initial_target_angle", 0.0); 
         this->declare_parameter("auto_start", true);
+        this->declare_parameter("base_gravity_thrust", 12.0); // Base thrust for gravity compensation
 
         kp_ = this->get_parameter("kp").as_double();
         ki_ = this->get_parameter("ki").as_double();
@@ -23,6 +24,9 @@ namespace prop_arm_control
         max_motor_force_ = this->get_parameter("max_motor_force").as_double();
         min_motor_force_ = this->get_parameter("min_motor_force").as_double();
         control_frequency_ = this->get_parameter("control_frequency").as_double();
+
+        // CRITICAL: Ensure minimum force is never negative
+        min_motor_force_ = std::max(0.0, min_motor_force_);
 
         // Set initial target to horizontal position (MIT frame)
         double initial_target_degrees = this->get_parameter("initial_target_angle").as_double();
@@ -40,15 +44,16 @@ namespace prop_arm_control
         startup_counter_ = 0;
         auto_started_ = false;
 
-        RCLCPP_INFO(this->get_logger(), "Controller parameters loaded:");
+        RCLCPP_INFO(this->get_logger(), "Controller parameters (POSITIVE THRUST CONSTRAINT):");
         RCLCPP_INFO(this->get_logger(), "  PID gains - kp: %.2f, ki: %.2f, kd: %.2f", kp_, ki_, kd_);
-        RCLCPP_INFO(this->get_logger(), "  Motor limits: [%.1f, %.1f] N", min_motor_force_, max_motor_force_);
+        RCLCPP_INFO(this->get_logger(), "  Motor limits: [%.1f, %.1f] N (NO NEGATIVE THRUST)", 
+                    min_motor_force_, max_motor_force_);
         RCLCPP_INFO(this->get_logger(), "  Control frequency: %.1f Hz", control_frequency_);
         RCLCPP_INFO(this->get_logger(), "  Initial target: %.1f° (%.3f rad)",
                     gazeboToMitAngle(target_angle_), target_angle_);
 
-        // Create publishers
-        RCLCPP_INFO(this->get_logger(), "Creating publishers...");
+        // Create publishers for IMMEDIATE command override
+        RCLCPP_INFO(this->get_logger(), "Creating publishers for immediate command processing...");
         motor_effort_pub_ = this->create_publisher<std_msgs::msg::Float64>(
             "/motor_force_controller/command", 10);
 
@@ -69,13 +74,13 @@ namespace prop_arm_control
 
         RCLCPP_INFO(this->get_logger(), "Subscribers created successfully");
 
-        // Create startup diagnostics timer (runs every second during startup)
+        // Create startup diagnostics timer
         startup_timer_ = this->create_wall_timer(
             std::chrono::seconds(1),
             std::bind(&PropellerForceController::startup_diagnostics, this));
 
-        // Create control timer
-        RCLCPP_INFO(this->get_logger(), "Setting up control timer...");
+        // Create control timer with high frequency for immediate response
+        RCLCPP_INFO(this->get_logger(), "Setting up high-frequency control timer...");
         control_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(static_cast<int>(1000 / control_frequency_)),
             std::bind(&PropellerForceController::control_loop, this));
@@ -84,8 +89,10 @@ namespace prop_arm_control
         send_zero_commands();
 
         RCLCPP_INFO(this->get_logger(), "Propeller Force Controller fully initialized!");
+        RCLCPP_INFO(this->get_logger(), "PHYSICS CONSTRAINT: POSITIVE THRUST ONLY (Realistic propeller)");
         RCLCPP_INFO(this->get_logger(), "Target: 0° = horizontal, +90° = up, -90° = down (MIT frame)");
         RCLCPP_INFO(this->get_logger(), "Controller will auto-start when joint states are received");
+        RCLCPP_INFO(this->get_logger(), "New commands will IMMEDIATELY override previous ones");
     }
 
     double PropellerForceController::mitToGazeboAngle(double mit_angle_degrees) const
@@ -93,14 +100,12 @@ namespace prop_arm_control
         // MIT: 0° = horizontal, positive = up
         // Convert to radians
         double mit_radians = mit_angle_degrees * M_PI / 180.0;
-        // With corrected URDF, no transformation needed
         return mit_radians;
     }
 
     double PropellerForceController::gazeboToMitAngle(double gazebo_radians) const
     {
         // Convert from Gazebo frame back to MIT frame
-        // With corrected URDF, no transformation needed
         return gazebo_radians * 180.0 / M_PI;
     }
 
@@ -113,7 +118,6 @@ namespace prop_arm_control
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                                  "Waiting for joint states... (%d seconds)", startup_counter_);
 
-            // Check if joint_states topic exists
             if (startup_counter_ % 3 == 0)
             {
                 auto topic_names_and_types = this->get_topic_names_and_types();
@@ -131,17 +135,16 @@ namespace prop_arm_control
         }
         else
         {
-            // Joint states received, auto-start control
             if (!auto_started_)
             {
                 auto_started_ = true;
                 startup_timer_.reset();
-                RCLCPP_INFO(this->get_logger(), "Joint states received! Auto-starting control...");
+                RCLCPP_INFO(this->get_logger(), "=== POSITIVE THRUST CONTROLLER ACTIVATED ===");
                 RCLCPP_INFO(this->get_logger(), "Current arm angle: %.1f° MIT frame",
                             gazeboToMitAngle(current_angle_));
                 RCLCPP_INFO(this->get_logger(), "Target arm angle: %.1f° MIT frame",
                             gazeboToMitAngle(target_angle_));
-                RCLCPP_INFO(this->get_logger(), "Controller now active and stabilizing arm!");
+                RCLCPP_INFO(this->get_logger(), "Controller active with POSITIVE THRUST ONLY constraint!");
             }
         }
     }
@@ -150,7 +153,7 @@ namespace prop_arm_control
     {
         if (!joint_state_received_)
         {
-            RCLCPP_INFO(this->get_logger(), "First joint state message received!");
+            RCLCPP_INFO(this->get_logger(), "First joint state received - Controller ready for IMMEDIATE overrides!");
             joint_state_received_ = true;
         }
 
@@ -159,7 +162,6 @@ namespace prop_arm_control
         {
             if (msg->name[i] == "arm_link_joint")
             {
-                // Store angle in Gazebo frame, will convert as needed
                 current_angle_ = msg->position[i];
                 if (i < msg->velocity.size())
                 {
@@ -169,19 +171,20 @@ namespace prop_arm_control
             }
         }
 
-        // If we reach here, arm_link_joint was not found
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                              "Joint 'arm_link_joint' not found in joint states");
     }
 
     void PropellerForceController::target_angle_callback(const std_msgs::msg::Float64::SharedPtr msg)
     {
-        // Input is in MIT frame (degrees), convert to Gazebo frame (radians)
+        // IMMEDIATE OVERRIDE: New target immediately breaks previous control
         target_angle_ = mitToGazeboAngle(msg->data);
         integral_error_ = 0.0; // Reset integral term for new target
 
-        RCLCPP_INFO(this->get_logger(), "New target angle set: %.1f° MIT frame (%.3f rad Gazebo frame)",
+        RCLCPP_INFO(this->get_logger(), "=== IMMEDIATE TARGET OVERRIDE ===");
+        RCLCPP_INFO(this->get_logger(), "New target: %.1f° MIT frame (%.3f rad) - POSITIVE THRUST ONLY",
                     msg->data, target_angle_);
+        RCLCPP_INFO(this->get_logger(), "Previous control IMMEDIATELY overridden");
     }
 
     void PropellerForceController::send_zero_commands()

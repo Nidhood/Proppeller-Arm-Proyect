@@ -37,21 +37,21 @@ def generate_launch_description():
             )]
         ),
         
-        # 2. Spawn position_controller:
-        TimerAction(
-            period=8.0,
-            actions=[Node(
-                package='controller_manager',
-                executable='spawner',
-                name='spawner_position_controller',
-                arguments=[
-                    'position_controller',
-                    '--controller-manager', '/controller_manager'
-                ],
-                parameters=[{'use_sim_time': use_sim_time}],
-                output='screen',
-            )]
-        ),
+        # # 2. Spawn position_controller:
+        # TimerAction(
+        #     period=8.0,
+        #     actions=[Node(
+        #         package='controller_manager',
+        #         executable='spawner',
+        #         name='spawner_position_controller',
+        #         arguments=[
+        #             'position_controller',
+        #             '--controller-manager', '/controller_manager'
+        #         ],
+        #         parameters=[{'use_sim_time': use_sim_time}],
+        #         output='screen',
+        #     )]
+        # ),
 
         # 3. Spawn motor_force_controller:
         TimerAction(
@@ -85,15 +85,15 @@ def generate_launch_description():
             )]
         ),
 
-        # 5. Start the propeller force controller node:
-        TimerAction(
-            period=10.0,
-            actions=[Node(
-                package='prop_arm_gazebo_control',
-                executable='propeller_force_controller_node',
-                name='propeller_force_controller',
-                output='screen',
-                parameters=[{'use_sim_time': use_sim_time}],
-            )]
-        ),
+        # # 5. Start the propeller force controller node:
+        # TimerAction(
+        #     period=10.0,
+        #     actions=[Node(
+        #         package='prop_arm_gazebo_control',
+        #         executable='propeller_force_controller_node',
+        #         name='propeller_force_controller',
+        #         output='screen',
+        #         parameters=[{'use_sim_time': use_sim_time}],
+        #     )]
+        # ),
     ])
