@@ -11,7 +11,7 @@
             <timeConstantUp>0.01</timeConstantUp>            
             <timeConstantDown>0.005</timeConstantDown>
             <maxRotVelocity>785.0</maxRotVelocity>           
-            <motorConstant>0.008</motorConstant>          
+            <motorConstant>0.005</motorConstant>          
             <momentConstant>0.02</momentConstant>            
             <commandSubTopic>command/motor_speed</commandSubTopic>
             <actuator_number>0</actuator_number>

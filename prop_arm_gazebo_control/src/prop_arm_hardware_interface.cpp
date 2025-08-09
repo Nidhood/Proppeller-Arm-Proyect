@@ -250,6 +250,7 @@ namespace prop_arm_gazebo_control
             bool effort_changed = (std::abs(joint_data.effort_command - joint_data.last_effort_command) > 1e-6);
             bool velocity_changed = (std::abs(joint_data.velocity_command - joint_data.last_velocity_command) > 1e-6);
 
+<<<<<<< HEAD
             // Priority: Effort > Velocity (SIMPLIFIED - no position control here)
             if (std::abs(joint_data.effort_command) > 1e-6 || effort_changed)
             {
@@ -272,16 +273,50 @@ namespace prop_arm_gazebo_control
             {
                 // Direct velocity mode
                 motor_command = std::max(0.0, joint_data.velocity_command);
+=======
+            // Priority: Velocity > Effort (for angle hold controller)
+            if (std::abs(joint_data.velocity_command) > 1e-6 || velocity_changed)
+            {
+                // Direct velocity mode - this is what the angle controller uses
+                motor_command = joint_data.velocity_command;
+
+                // Ensure positive motor velocity (physical constraint)
+                motor_command = std::max(0.0, motor_command);
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
                 command_received = true;
                 joint_data.last_velocity_command = joint_data.velocity_command;
 
                 RCLCPP_DEBUG(rclcpp::get_logger("PropArmHardware"),
                              "Velocity mode: %.2f rad/s", motor_command);
+<<<<<<< HEAD
+=======
+            }
+            else if (std::abs(joint_data.effort_command) > 1e-6 || effort_changed)
+            {
+                // Force mode - convert to motor speed
+                double force_command = std::max(0.0, joint_data.effort_command);
+
+                if (force_command > 0.001)
+                {
+                    double k_motor = 0.008; // F = k * omega^2
+                    motor_command = std::sqrt(force_command / k_motor);
+                }
+
+                command_received = true;
+                joint_data.last_effort_command = joint_data.effort_command;
+
+                RCLCPP_DEBUG(rclcpp::get_logger("PropArmHardware"),
+                             "Effort mode: %.2fN -> %.2f rad/s", force_command, motor_command);
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
             }
 
             // Send command to motor
             if (command_received)
             {
+<<<<<<< HEAD
+=======
+                // Apply motor speed limits
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
                 motor_command = std::max(0.0, std::min(785.0, motor_command));
 
                 gz::msgs::Actuators actuators_msg;
@@ -295,15 +330,22 @@ namespace prop_arm_gazebo_control
                                          "Failed to publish motor command");
                 }
 
-                // Update model
+                // Update electro-mechanical model
                 updateElectroMechanicalModel(joint_name, motor_command, period.seconds());
             }
             else
             {
+<<<<<<< HEAD
                 // No command - send zero
+=======
+                // No command - send zero to stop motor
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
                 gz::msgs::Actuators actuators_msg;
                 actuators_msg.add_velocity(0.0);
                 actuators_pub_.Publish(actuators_msg);
+
+                // Update model with zero command
+                updateElectroMechanicalModel(joint_name, 0.0, period.seconds());
             }
         }
 

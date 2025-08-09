@@ -33,7 +33,6 @@ namespace prop_arm_control
 
         // Utility methods
         void print_current_controllers();
-        void test_sequence();
         void stabilize_at_horizontal();
 
     private:

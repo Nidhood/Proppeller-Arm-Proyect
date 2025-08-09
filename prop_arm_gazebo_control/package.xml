@@ -1,51 +1,35 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypeDL="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
     <name>prop_arm_gazebo_control</name>
-    <version>0.0.1</version>
-    <description>Control and hardware interface for the Prop Arm system using ros2_control with electro-mechanical model</description>
-
-    <maintainer email="ivan.oroz34@gmail.com">Nidhood</maintainer>
-    <license>BSD-3-Clause</license>
+    <version>0.0.0</version>
+    <description>PropArm Gazebo Control Package</description>
+    <maintainer email="your_email@example.com">Your Name</maintainer>
+    <license>Apache-2.0</license>
 
     <buildtool_depend>ament_cmake</buildtool_depend>
 
-    <!-- Core dependencies -->
+    <!-- Core ROS2 dependencies -->
     <depend>rclcpp</depend>
+    <depend>rclcpp_components</depend>
     <depend>rclcpp_lifecycle</depend>
-    <depend>hardware_interface</depend>
-    <depend>pluginlib</depend>
-
-    <!-- ROS2 Control dependencies -->
-    <depend>controller_interface</depend>
-    <depend>realtime_tools</depend>
-    <depend>control_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>std_msgs</depend>
     <depend>trajectory_msgs</depend>
 
-    <!-- Standard ROS2 Controllers -->
-    <exec_depend>joint_state_broadcaster</exec_depend>
-    <exec_depend>effort_controllers</exec_depend>
-    <exec_depend>velocity_controllers</exec_depend>
-    <exec_depend>joint_trajectory_controller</exec_depend>
-    <exec_depend>controller_manager</exec_depend>
-
-    <!-- Message dependencies -->
-    <depend>std_msgs</depend>
-    <depend>sensor_msgs</depend>
-    <depend>geometry_msgs</depend>
-    <depend>rosgraph_msgs</depend>
+    <!-- Hardware interface dependencies -->
+    <depend>hardware_interface</depend>
+    <depend>pluginlib</depend>
+    <depend>gz_ros2_control</depend>
 
     <!-- Gazebo dependencies -->
+    <depend>gz-sim8</depend>
     <depend>gz-transport13</depend>
     <depend>gz-msgs10</depend>
-    <depend>gz-sim8</depend>
 
-    <!-- ROS-Gazebo bridge -->
-    <exec_depend>ros_gz_bridge</exec_depend>
-    <exec_depend>gz_ros2_control</exec_depend>
-
-    <!-- Launch and configuration -->
-    <exec_depend>launch_ros</exec_depend>
-    <exec_depend>xacro</exec_depend>
+    <!-- Linear algebra -->
+    <depend>eigen3_cmake_module</depend>
+    <build_depend>eigen3</build_depend>
 
     <!-- Testing -->
     <test_depend>ament_lint_auto</test_depend>
@@ -53,6 +37,6 @@
 
     <export>
         <build_type>ament_cmake</build_type>
-        <hardware_interface plugin="${prefix}/prop_arm_hardware_interface_plugin.xml"/>
+        <gz_ros2_control plugin="${prefix}/prop_arm_hardware_interface_plugin.xml"/>
     </export>
 </package>
