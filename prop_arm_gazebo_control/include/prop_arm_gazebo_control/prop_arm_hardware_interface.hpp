@@ -136,4 +136,10 @@ namespace prop_arm_gazebo_control
                                           double dt);
     };
 
+<<<<<<< HEAD
 } // namespace prop_arm_gazebo_control
+=======
+} // namespace prop_arm_gazebo_control
+
+#endif // PROP_ARM_HARDWARE_INTERFACE_HPP_
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)

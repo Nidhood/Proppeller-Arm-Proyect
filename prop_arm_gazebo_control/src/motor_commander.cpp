@@ -79,6 +79,7 @@ namespace prop_arm_control
         effort_msg.data.push_back(thrust_force);
         effort_pub_->publish(effort_msg);
 
+<<<<<<< HEAD
         // Send direct motor command with corrected motor model
         if (thrust_force > 0.01)
         {
@@ -86,6 +87,12 @@ namespace prop_arm_control
             // Solve for ω: ω = sqrt(F/k)
             double k_motor = 0.008; // From Gazebo plugin configuration
             double motor_speed = std::sqrt(thrust_force / k_motor);
+=======
+        // Also send direct motor command as backup
+        if (thrust_force > 0.1)
+        {
+            double motor_speed = std::sqrt(thrust_force / 0.008); // F = k * ω²
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
             motor_speed = std::min(motor_speed, 785.0);
 
             gz::msgs::Actuators motor_msg;
@@ -102,6 +109,7 @@ namespace prop_arm_control
     double MotorCommander::calculateThrustForAngle(double target_angle_degrees)
     {
         double target_rad = mitToGazeboAngle(target_angle_degrees);
+<<<<<<< HEAD
 
         // CORRECTED ARM PARAMETERS (based on typical PropArm specifications)
         double arm_mass = 2.0;       // kg (realistic arm mass)
@@ -139,6 +147,39 @@ namespace prop_arm_control
         RCLCPP_DEBUG(this->get_logger(),
                      "Physics calculation: angle=%.1f°, torque=%.2f N⋅m, thrust=%.2f N",
                      target_angle_degrees, gravitational_torque, required_thrust);
+=======
+
+        // Base parameters (adjust based on your arm's physical properties)
+        double arm_mass = 1.0;   // kg (estimate)
+        double arm_length = 0.5; // m (estimate)
+        double gravity = 9.81;   // m/s²
+
+        // Gravitational torque at current angle: τ_gravity = m*g*L*sin(θ)
+        double gravitational_torque = arm_mass * gravity * arm_length * std::sin(target_rad);
+
+        // Convert torque to thrust force (assuming thrust acts at arm length)
+        double required_thrust = gravitational_torque / arm_length;
+
+        // Add control margin for stability
+        double control_margin = 2.0; // N
+
+        if (target_angle_degrees >= 0.0)
+        {
+
+            // Upward angles: need thrust to overcome gravity + margin
+            required_thrust = std::abs(required_thrust) + control_margin;
+        }
+        else
+        {
+
+            // Downward angles: reduce thrust, let gravity help
+            // Use minimal thrust for control, not to fight gravity
+            required_thrust = std::max(0.0, control_margin - std::abs(required_thrust));
+        }
+
+        // Apply realistic limits
+        required_thrust = std::max(0.0, std::min(50.0, required_thrust));
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
 
         return required_thrust;
     }
@@ -158,11 +199,18 @@ namespace prop_arm_control
         effort_msg.data.push_back(force_newtons);
         effort_pub_->publish(effort_msg);
 
+<<<<<<< HEAD
         // Direct motor command with corrected conversion
         if (force_newtons > 0.01)
         {
             double k_motor = 0.008;
             double motor_speed = std::sqrt(force_newtons / k_motor);
+=======
+        // Direct motor command
+        if (force_newtons > 0.1)
+        {
+            double motor_speed = std::sqrt(force_newtons / 0.008);
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
             motor_speed = std::min(motor_speed, 785.0);
 
             gz::msgs::Actuators motor_msg;
@@ -206,7 +254,11 @@ namespace prop_arm_control
         send_zero_commands();
 
         // Send multiple zero commands to ensure reception
+<<<<<<< HEAD
         for (int i = 0; i < 5; i++)
+=======
+        for (int i = 0; i < 3; i++)
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
         {
             gz::msgs::Actuators motor_msg;
             motor_msg.add_velocity(0.0);
@@ -228,6 +280,7 @@ namespace prop_arm_control
         RCLCPP_INFO(this->get_logger(), "Thrust range: 0-45N (positive only)");
     }
 
+<<<<<<< HEAD
     void MotorCommander::test_sequence()
     {
         RCLCPP_INFO(this->get_logger(), "=== MIT PropArm Test Sequence (Corrected Physics) ===");
@@ -259,6 +312,8 @@ namespace prop_arm_control
         RCLCPP_INFO(this->get_logger(), "=== Test Complete - Physics Model Validated ===");
     }
 
+=======
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
     void MotorCommander::stabilize_at_horizontal()
     {
         RCLCPP_INFO(this->get_logger(), "Stabilizing at horizontal position with gravity compensation...");
@@ -295,6 +350,7 @@ int main(int argc, char *argv[])
     rclcpp::init(argc, argv);
     auto commander = std::make_shared<prop_arm_control::MotorCommander>();
 
+<<<<<<< HEAD
     if (command == "test")
     {
         commander->test_sequence();
@@ -303,6 +359,12 @@ int main(int argc, char *argv[])
     {
         commander->stabilize_at_horizontal();
         std::this_thread::sleep_for(std::chrono::seconds(3));
+=======
+    if (command == "stabilize")
+    {
+        commander->stabilize_at_horizontal();
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
     }
     else if (command == "stop")
     {
@@ -325,8 +387,12 @@ int main(int argc, char *argv[])
             commander->command_velocity(value);
         }
 
+<<<<<<< HEAD
         // Keep the node alive longer to ensure command execution
         std::this_thread::sleep_for(std::chrono::seconds(2));
+=======
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+>>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
     }
 
     rclcpp::shutdown();
