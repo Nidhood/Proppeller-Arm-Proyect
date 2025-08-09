@@ -2,6 +2,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <cmath>
@@ -35,9 +36,9 @@ namespace prop_arm_control
         double control_frequency_;
         double dt_;
 
-        // ROS2 Publishers
-        rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr motor_effort_pub_;
-        rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr motor_velocity_pub_;
+        // ROS2 Publishers - CORRECTED to use Float64MultiArray
+        rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr motor_effort_pub_;
+        rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr motor_velocity_pub_;
 
         // ROS2 Subscribers
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
@@ -56,6 +57,9 @@ namespace prop_arm_control
         // MIT reference frame conversion methods
         double mitToGazeboAngle(double mit_angle_degrees) const;
         double gazeboToMitAngle(double gazebo_radians) const;
+
+        // CORRECTED physics calculation
+        double calculateGravityCompensation(double current_angle_rad);
 
         // Callback methods
         void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg);

@@ -1,6 +1,4 @@
-#ifndef PROP_ARM_HARDWARE_INTERFACE_HPP_
-#define PROP_ARM_HARDWARE_INTERFACE_HPP_
-
+#pragma once
 #include <memory>
 #include <string>
 #include <vector>
@@ -139,5 +137,3 @@ namespace prop_arm_gazebo_control
     };
 
 } // namespace prop_arm_gazebo_control
-
-#endif // PROP_ARM_HARDWARE_INTERFACE_HPP_

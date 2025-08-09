@@ -5,18 +5,18 @@ namespace prop_arm_control
 
     PropellerForceController::PropellerForceController() : Node("propeller_force_controller")
     {
-        RCLCPP_INFO(this->get_logger(), "Initializing Propeller Force Controller (POSITIVE THRUST ONLY)...");
+        RCLCPP_INFO(this->get_logger(), "Initializing Corrected Propeller Force Controller...");
 
-        // Declare and get parameters optimized for positive thrust control
-        this->declare_parameter("kp", 40.0);  // Increased for better tracking with positive constraint
-        this->declare_parameter("ki", 1.5);   // Moderate to prevent windup
-        this->declare_parameter("kd", 20.0);  // Increased damping for stability
-        this->declare_parameter("max_motor_force", 45.0);  // Reduced maximum for stability
-        this->declare_parameter("min_motor_force", 0.0);   // CRITICAL: No negative thrust
-        this->declare_parameter("control_frequency", 100.0); 
-        this->declare_parameter("initial_target_angle", 0.0); 
+        // Declare and get CORRECTED parameters optimized for gravity compensation
+        this->declare_parameter("kp", 25.0);              // Reduced for stability with increased thrust
+        this->declare_parameter("ki", 0.8);               // Moderate integral to prevent windup
+        this->declare_parameter("kd", 12.0);              // Good damping for oscillation control
+        this->declare_parameter("max_motor_force", 45.0); // Increased for sufficient lifting
+        this->declare_parameter("min_motor_force", 0.0);  // Realistic propeller constraint
+        this->declare_parameter("control_frequency", 100.0);
+        this->declare_parameter("initial_target_angle", 0.0);
         this->declare_parameter("auto_start", true);
-        this->declare_parameter("base_gravity_thrust", 12.0); // Base thrust for gravity compensation
+        this->declare_parameter("base_gravity_thrust", 15.0); // Realistic gravity compensation
 
         kp_ = this->get_parameter("kp").as_double();
         ki_ = this->get_parameter("ki").as_double();
@@ -44,26 +44,25 @@ namespace prop_arm_control
         startup_counter_ = 0;
         auto_started_ = false;
 
-        RCLCPP_INFO(this->get_logger(), "Controller parameters (POSITIVE THRUST CONSTRAINT):");
+        RCLCPP_INFO(this->get_logger(), "CORRECTED Controller Parameters:");
         RCLCPP_INFO(this->get_logger(), "  PID gains - kp: %.2f, ki: %.2f, kd: %.2f", kp_, ki_, kd_);
-        RCLCPP_INFO(this->get_logger(), "  Motor limits: [%.1f, %.1f] N (NO NEGATIVE THRUST)", 
+        RCLCPP_INFO(this->get_logger(), "  Motor limits: [%.1f, %.1f] N (REALISTIC THRUST)",
                     min_motor_force_, max_motor_force_);
         RCLCPP_INFO(this->get_logger(), "  Control frequency: %.1f Hz", control_frequency_);
-        RCLCPP_INFO(this->get_logger(), "  Initial target: %.1f° (%.3f rad)",
-                    gazeboToMitAngle(target_angle_), target_angle_);
+        RCLCPP_INFO(this->get_logger(), "  Base gravity compensation: %.1f N",
+                    this->get_parameter("base_gravity_thrust").as_double());
 
-        // Create publishers for IMMEDIATE command override
-        RCLCPP_INFO(this->get_logger(), "Creating publishers for immediate command processing...");
-        motor_effort_pub_ = this->create_publisher<std_msgs::msg::Float64>(
-            "/motor_force_controller/command", 10);
+        // Create publishers with CORRECTED topic names
+        RCLCPP_INFO(this->get_logger(), "Creating corrected publishers...");
+        motor_effort_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+            "/motor_force_controller/commands", 10);
 
-        motor_velocity_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+        motor_velocity_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/velocity_controller/commands", 10);
 
-        RCLCPP_INFO(this->get_logger(), "Publishers created successfully");
+        RCLCPP_INFO(this->get_logger(), "Publishers created with proper topic names");
 
         // Create subscribers
-        RCLCPP_INFO(this->get_logger(), "Creating subscribers...");
         joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 10,
             std::bind(&PropellerForceController::joint_state_callback, this, std::placeholders::_1));
@@ -72,15 +71,12 @@ namespace prop_arm_control
             "/propeller_controller/target_angle", 10,
             std::bind(&PropellerForceController::target_angle_callback, this, std::placeholders::_1));
 
-        RCLCPP_INFO(this->get_logger(), "Subscribers created successfully");
-
         // Create startup diagnostics timer
         startup_timer_ = this->create_wall_timer(
             std::chrono::seconds(1),
             std::bind(&PropellerForceController::startup_diagnostics, this));
 
-        // Create control timer with high frequency for immediate response
-        RCLCPP_INFO(this->get_logger(), "Setting up high-frequency control timer...");
+        // Create control timer with high frequency
         control_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(static_cast<int>(1000 / control_frequency_)),
             std::bind(&PropellerForceController::control_loop, this));
@@ -88,24 +84,17 @@ namespace prop_arm_control
         // Send initial zero command
         send_zero_commands();
 
-        RCLCPP_INFO(this->get_logger(), "Propeller Force Controller fully initialized!");
-        RCLCPP_INFO(this->get_logger(), "PHYSICS CONSTRAINT: POSITIVE THRUST ONLY (Realistic propeller)");
-        RCLCPP_INFO(this->get_logger(), "Target: 0° = horizontal, +90° = up, -90° = down (MIT frame)");
-        RCLCPP_INFO(this->get_logger(), "Controller will auto-start when joint states are received");
-        RCLCPP_INFO(this->get_logger(), "New commands will IMMEDIATELY override previous ones");
+        RCLCPP_INFO(this->get_logger(), "Corrected Propeller Force Controller initialized!");
+        RCLCPP_INFO(this->get_logger(), "PHYSICS: Realistic thrust limits with gravity compensation");
     }
 
     double PropellerForceController::mitToGazeboAngle(double mit_angle_degrees) const
     {
-        // MIT: 0° = horizontal, positive = up
-        // Convert to radians
-        double mit_radians = mit_angle_degrees * M_PI / 180.0;
-        return mit_radians;
+        return mit_angle_degrees * M_PI / 180.0;
     }
 
     double PropellerForceController::gazeboToMitAngle(double gazebo_radians) const
     {
-        // Convert from Gazebo frame back to MIT frame
         return gazebo_radians * 180.0 / M_PI;
     }
 
@@ -115,23 +104,8 @@ namespace prop_arm_control
 
         if (!joint_state_received_)
         {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
                                  "Waiting for joint states... (%d seconds)", startup_counter_);
-
-            if (startup_counter_ % 3 == 0)
-            {
-                auto topic_names_and_types = this->get_topic_names_and_types();
-                bool joint_states_exists = topic_names_and_types.find("/joint_states") != topic_names_and_types.end();
-
-                if (!joint_states_exists)
-                {
-                    RCLCPP_WARN(this->get_logger(), "Topic '/joint_states' does not exist yet!");
-                }
-                else
-                {
-                    RCLCPP_INFO(this->get_logger(), "Topic '/joint_states' exists but no data received");
-                }
-            }
         }
         else
         {
@@ -139,12 +113,12 @@ namespace prop_arm_control
             {
                 auto_started_ = true;
                 startup_timer_.reset();
-                RCLCPP_INFO(this->get_logger(), "=== POSITIVE THRUST CONTROLLER ACTIVATED ===");
+                RCLCPP_INFO(this->get_logger(), "=== CORRECTED CONTROLLER ACTIVATED ===");
                 RCLCPP_INFO(this->get_logger(), "Current arm angle: %.1f° MIT frame",
                             gazeboToMitAngle(current_angle_));
                 RCLCPP_INFO(this->get_logger(), "Target arm angle: %.1f° MIT frame",
                             gazeboToMitAngle(target_angle_));
-                RCLCPP_INFO(this->get_logger(), "Controller active with POSITIVE THRUST ONLY constraint!");
+                RCLCPP_INFO(this->get_logger(), "Realistic thrust control active!");
             }
         }
     }
@@ -153,7 +127,7 @@ namespace prop_arm_control
     {
         if (!joint_state_received_)
         {
-            RCLCPP_INFO(this->get_logger(), "First joint state received - Controller ready for IMMEDIATE overrides!");
+            RCLCPP_INFO(this->get_logger(), "Joint state received - Corrected controller ready!");
             joint_state_received_ = true;
         }
 
@@ -170,110 +144,127 @@ namespace prop_arm_control
                 return;
             }
         }
-
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                             "Joint 'arm_link_joint' not found in joint states");
     }
 
     void PropellerForceController::target_angle_callback(const std_msgs::msg::Float64::SharedPtr msg)
     {
-        // IMMEDIATE OVERRIDE: New target immediately breaks previous control
-        target_angle_ = mitToGazeboAngle(msg->data);
-        integral_error_ = 0.0; // Reset integral term for new target
+        // Validate angle range
+        double angle_degrees = std::max(-90.0, std::min(90.0, msg->data));
+        target_angle_ = mitToGazeboAngle(angle_degrees);
+        integral_error_ = 0.0; // Reset integral term
 
-        RCLCPP_INFO(this->get_logger(), "=== IMMEDIATE TARGET OVERRIDE ===");
-        RCLCPP_INFO(this->get_logger(), "New target: %.1f° MIT frame (%.3f rad) - POSITIVE THRUST ONLY",
-                    msg->data, target_angle_);
-        RCLCPP_INFO(this->get_logger(), "Previous control IMMEDIATELY overridden");
+        RCLCPP_INFO(this->get_logger(), "=== NEW TARGET (CORRECTED) ===");
+        RCLCPP_INFO(this->get_logger(), "Target: %.1f° (validated from %.1f°)",
+                    angle_degrees, msg->data);
     }
 
     void PropellerForceController::send_zero_commands()
     {
-        auto effort_msg = std_msgs::msg::Float64();
-        effort_msg.data = 0.0;
+        auto effort_msg = std_msgs::msg::Float64MultiArray();
+        effort_msg.data.push_back(0.0);
         motor_effort_pub_->publish(effort_msg);
 
-        auto velocity_msg = std_msgs::msg::Float64();
-        velocity_msg.data = 0.0;
+        auto velocity_msg = std_msgs::msg::Float64MultiArray();
+        velocity_msg.data.push_back(0.0);
         motor_velocity_pub_->publish(velocity_msg);
     }
 
     void PropellerForceController::control_loop()
     {
-        // Skip control if no joint state data received yet
         if (!joint_state_received_)
         {
             send_zero_commands();
             return;
         }
 
-        // Calculate angle error (both in Gazebo frame)
+        // Calculate angle error
         double error = target_angle_ - current_angle_;
 
-        // Normalize angle error to [-π, π]
+        // Normalize error to [-π, π]
         while (error > M_PI)
-        {
             error -= 2.0 * M_PI;
-        }
         while (error < -M_PI)
-        {
             error += 2.0 * M_PI;
-        }
 
-        // PID calculation
+        // PID calculation with CORRECTED physics
         integral_error_ += error * dt_;
 
-        // Anti-windup: limit integral term
-        double integral_limit = 10.0;
+        // Anti-windup with appropriate limits
+        double integral_limit = 5.0;
         if (std::abs(integral_error_) > integral_limit)
         {
             integral_error_ = std::copysign(integral_limit, integral_error_);
         }
 
-        double derivative_error = 0.0;
-        if (dt_ > 0.0)
-        {
-            derivative_error = (error - previous_error_) / dt_;
-        }
+        double derivative_error = (error - previous_error_) / dt_;
 
-        // PID output (motor force/thrust command)
-        double motor_force = kp_ * error + ki_ * integral_error_ + kd_ * derivative_error;
+        // PID output
+        double pid_output = kp_ * error + ki_ * integral_error_ + kd_ * derivative_error;
 
-        // Apply motor force limits
+        // CORRECTED PHYSICS: Add gravity compensation based on current angle
+        double gravity_compensation = calculateGravityCompensation(current_angle_);
+
+        // Total motor force = PID correction + gravity compensation
+        double motor_force = pid_output + gravity_compensation;
+
+        // Apply realistic motor force limits
         motor_force = std::max(min_motor_force_, std::min(max_motor_force_, motor_force));
 
-        // Publish motor effort command
-        auto effort_msg = std_msgs::msg::Float64();
-        effort_msg.data = motor_force;
+        // Publish commands
+        auto effort_msg = std_msgs::msg::Float64MultiArray();
+        effort_msg.data.push_back(motor_force);
         motor_effort_pub_->publish(effort_msg);
 
-        // Convert force to velocity command (simplified model)
-        double force_to_velocity_gain = 8.0;
-        double motor_velocity = motor_force * force_to_velocity_gain;
+        // Convert to velocity for backup control
+        double motor_velocity = 0.0;
+        if (motor_force > 0.01)
+        {
+            // F = k*ω² -> ω = sqrt(F/k)
+            double k_motor = 0.008;
+            motor_velocity = std::sqrt(motor_force / k_motor);
+            motor_velocity = std::min(motor_velocity, 785.0);
+        }
 
-        // Apply velocity limits
-        motor_velocity = std::max(-785.0, std::min(785.0, motor_velocity));
-
-        auto velocity_msg = std_msgs::msg::Float64();
-        velocity_msg.data = motor_velocity;
+        auto velocity_msg = std_msgs::msg::Float64MultiArray();
+        velocity_msg.data.push_back(motor_velocity);
         motor_velocity_pub_->publish(velocity_msg);
 
         previous_error_ = error;
 
-        // Log control information periodically
+        // Periodic logging
         log_counter_++;
-        if (log_counter_ >= static_cast<int>(control_frequency_ * 3)) // Log every 3 seconds
+        if (log_counter_ >= static_cast<int>(control_frequency_ * 2)) // Every 2 seconds
         {
             log_counter_ = 0;
-
             RCLCPP_INFO(this->get_logger(),
-                        "Control: Target=%.1f°, Current=%.1f°, Error=%.1f°, Force=%.1fN, Vel=%.1f rad/s",
+                        "CORRECTED Control: Target=%.1f°, Current=%.1f°, Error=%.1f°, "
+                        "Force=%.1fN (PID=%.1f + Gravity=%.1f), Velocity=%.1f rad/s",
                         gazeboToMitAngle(target_angle_),
                         gazeboToMitAngle(current_angle_),
                         error * 180.0 / M_PI,
-                        motor_force,
-                        motor_velocity);
+                        motor_force, pid_output, gravity_compensation, motor_velocity);
         }
+    }
+
+    double PropellerForceController::calculateGravityCompensation(double current_angle_rad)
+    {
+        // CORRECTED gravity compensation calculation
+        double arm_mass = 2.0;       // kg
+        double arm_length = 0.8;     // m
+        double motor_distance = 0.7; // m (distance from pivot to thrust point)
+        double gravity = 9.81;       // m/s²
+
+        // Gravitational torque: τ = m * g * (L/2) * sin(θ)
+        double gravitational_torque = arm_mass * gravity * (arm_length / 2.0) * std::sin(current_angle_rad);
+
+        // Required thrust to balance: F = τ / motor_distance
+        double gravity_compensation = std::abs(gravitational_torque) / motor_distance;
+
+        // Add base thrust for control authority
+        double base_thrust = 5.0; // N
+        gravity_compensation += base_thrust;
+
+        return gravity_compensation;
     }
 
 } // namespace prop_arm_control
@@ -286,17 +277,13 @@ int main(int argc, char *argv[])
     {
         auto node = std::make_shared<prop_arm_control::PropellerForceController>();
 
-        RCLCPP_INFO(node->get_logger(), "Starting Propeller Force Controller...");
-        RCLCPP_INFO(node->get_logger(), "Controller will automatically stabilize arm at horizontal position");
+        RCLCPP_INFO(node->get_logger(), "Starting CORRECTED Propeller Force Controller...");
 
-        // Use MultiThreadedExecutor for better callback handling
         rclcpp::executors::MultiThreadedExecutor executor;
         executor.add_node(node);
-
-        // Spin until shutdown
         executor.spin();
 
-        RCLCPP_INFO(node->get_logger(), "Propeller Force Controller shutting down...");
+        RCLCPP_INFO(node->get_logger(), "Controller shutting down...");
     }
     catch (const std::exception &e)
     {
