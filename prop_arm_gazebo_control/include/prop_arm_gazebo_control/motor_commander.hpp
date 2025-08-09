@@ -44,7 +44,7 @@ namespace prop_arm_control
             VELOCITY,
             EFFORT
         };
-        
+
         std::unique_ptr<gz::transport::Node> gz_node_;
 
         // Publishers for different controller types
