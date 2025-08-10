@@ -22,30 +22,4 @@
             <motorType>velocity</motorType>
         </plugin>
     </gazebo>
-
-    <!--Rotors command plugin-->
-    <!-- <gazebo>
-        <plugin filename="rotors_command_plugin" name="rotors_command_plugin::RotorsCommandPlugin">
-            <ros2_topic>rotors_speed</ros2_topic>
-            <gz_topic>swarm_drone/gazebo/command/motor_speed</gz_topic>
-        </plugin>
-    </gazebo> -->
-
-    <!--IMU Channel plugin-->
-    <!-- <gazebo>
-        <plugin filename="imu_channel_plugin" name="imu_channel_plugin::ImuChannelPlugin">
-            <ros2_topic>imu</ros2_topic>
-            <gz_topic>imu</gz_topic>
-            <update_rate>10</update_rate>
-        </plugin>
-    </gazebo> -->
-
-    <!-- Gazebo odometry -->
-    <!-- <gazebo>
-        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
-            <odom_publish_frecuency>20</odom_publish_frecuency>
-            <robot_base_frame>base_link</robot_base_frame>
-            <odom_frame>odom</odom_frame>
-        </plugin>
-    </gazebo> -->
 </robot>

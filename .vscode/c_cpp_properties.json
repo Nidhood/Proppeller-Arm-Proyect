@@ -9,13 +9,15 @@
         "/home/rasjave1/prop_arm_ws/install/prop_arm_gazebo_control/include/**",
         "/opt/ros/jazzy/include/**",
         "/home/rasjave1/prop_arm_ws/src/prop_arm_gazebo_control/include/**",
-        "/usr/include/**"
+        "/home/rasjave1/prop_arm_ws/src/prop_arm_gazebo_control/include/prop_arm_gazebo_control/**",
+        "/usr/include/**",
+        "${workspaceFolder}/prop_arm_gazebo_control/include"
       ],
       "name": "ROS",
       "intelliSenseMode": "gcc-x64",
       "compilerPath": "/usr/bin/gcc",
       "cStandard": "gnu11",
-      "cppStandard": "c++14"
+      "cppStandard": "c++17"
     }
   ],
   "version": 4
