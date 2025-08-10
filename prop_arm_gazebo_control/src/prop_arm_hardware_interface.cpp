@@ -1,360 +1,214 @@
 #include "prop_arm_gazebo_control/prop_arm_hardware_interface.hpp"
-
-// Gazebo simulation components
 #include <gz/sim/components/Joint.hh>
 #include <gz/sim/components/JointPosition.hh>
 #include <gz/sim/components/JointVelocity.hh>
-#include <gz/sim/components/JointVelocityCmd.hh>
-#include <gz/sim/components/JointForceCmd.hh>
-#include <gz/sim/components/JointTransmittedWrench.hh>
-#include <gz/sim/components/Name.hh>
 
 namespace prop_arm_gazebo_control
 {
 
-    bool PropArmHardware::initSim(
-        rclcpp::Node::SharedPtr &model_nh,
-        std::map<std::string, sim::Entity> &joints,
-        const hardware_interface::HardwareInfo &hardware_info,
-        sim::EntityComponentManager &_ecm,
-        unsigned int update_rate)
+    bool PropArmHardware::initSim(rclcpp::Node::SharedPtr &model_nh,
+                                  std::map<std::string, sim::Entity> &joints,
+                                  const hardware_interface::HardwareInfo &hardware_info,
+                                  sim::EntityComponentManager &ecm,
+                                  unsigned int /*update_rate*/)
     {
         RCLCPP_INFO(rclcpp::get_logger("PropArmHardware"), "Initializing PropArm Hardware Interface");
 
-        this->nh_ = model_nh;
-        this->ecm_ = &_ecm;
-        this->enabled_joints_ = joints;
-        this->update_rate_ = update_rate;
+        nh_ = model_nh;
+        ecm_ = &ecm;
+        enabled_joints_ = joints;
 
-        // Get robot namespace
-        robot_namespace_ = "prop_arm";
-        auto param_it = hardware_info.hardware_parameters.find("robot_namespace");
-        if (param_it != hardware_info.hardware_parameters.end())
-        {
-            robot_namespace_ = param_it->second;
-        }
+        // Parameters from URDF <hardware><param ...>
+        if (auto it = hardware_info.hardware_parameters.find("robot_namespace");
+            it != hardware_info.hardware_parameters.end())
+            robot_namespace_ = it->second;
 
-        // Initialize Gazebo transport
-        gz_node_ = std::make_unique<gz::transport::Node>();
+        if (auto it = hardware_info.hardware_parameters.find("actuator_index");
+            it != hardware_info.hardware_parameters.end())
+            actuator_index_ = std::max(0, std::stoi(it->second));
+
+        if (auto it = hardware_info.hardware_parameters.find("max_rot_velocity_radps");
+            it != hardware_info.hardware_parameters.end())
+            max_rot_vel_ = std::max(0.0, std::stod(it->second));
+
+        // Topic: /<ns>/command/motor_speed
         actuators_topic_ = "/" + robot_namespace_ + "/command/motor_speed";
+        gz_node_ = std::make_unique<gz::transport::Node>();
         actuators_pub_ = gz_node_->Advertise<gz::msgs::Actuators>(actuators_topic_);
+        RCLCPP_INFO(nh_->get_logger(), "Actuators topic: %s (actuator_index=%d, vmax=%.2f rad/s)",
+                    actuators_topic_.c_str(), actuator_index_, max_rot_vel_);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        // Publisher initialization:
+        if (auto it = hardware_info.hardware_parameters.find("tau_up");
+            it != hardware_info.hardware_parameters.end())
+            tau_up_ = std::max(1e-6, std::stod(it->second));
+        if (auto it = hardware_info.hardware_parameters.find("tau_down");
+            it != hardware_info.hardware_parameters.end())
+            tau_down_ = std::max(1e-6, std::stod(it->second));
 
-        // Initialize joints
-        for (const auto &joint_info : hardware_info.joints)
+        motor_speed_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
+            "/prop_arm/motor_speed_est", rclcpp::QoS(10).best_effort());
+
+        // rm angle publisher (in degrees)
+        arm_angle_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
+            "/prop_arm/arm_angle_deg", rclcpp::QoS(10).best_effort());
+
+        // Build interfaces
+        state_interfaces_.clear();
+        command_interfaces_.clear();
+        state_interfaces_.reserve(hardware_info.joints.size() * 2);
+        command_interfaces_.reserve(hardware_info.joints.size());
+
+        for (const auto &ji : hardware_info.joints)
         {
-            const std::string &joint_name = joint_info.name;
+            const std::string &name = ji.name;
 
-            auto it = enabled_joints_.find(joint_name);
+            auto it = enabled_joints_.find(name);
             if (it == enabled_joints_.end())
             {
-                RCLCPP_WARN(this->nh_->get_logger(), "Joint '%s' not found", joint_name.c_str());
+                RCLCPP_WARN(nh_->get_logger(), "Joint '%s' not found in sim", name.c_str());
                 continue;
             }
 
-            // Initialize joint data
-            joints_[joint_name] = JointData{};
-            joints_[joint_name].sim_joint = it->second;
+            auto &jd = joints_[name]; // creates default JointData
+            jd.sim_joint = it->second;
 
-            // Initialize PID with corrected parameters
-            pid_controllers_[joint_name] = PIDController{};
-            pid_controllers_[joint_name].kp = 0.0; // Disable PID position control
-            pid_controllers_[joint_name].ki = 0.0; // Let effort controller handle it
-            pid_controllers_[joint_name].kd = 0.0; // Avoid conflicts
-            pid_controllers_[joint_name].output_min = 0.0;
-            pid_controllers_[joint_name].output_max = 785.0;
+            // Ensure position/velocity components exist
+            if (!ecm.EntityHasComponentType(jd.sim_joint, gz::sim::components::JointPosition().TypeId()))
+                ecm.CreateComponent(jd.sim_joint, gz::sim::components::JointPosition());
+            if (!ecm.EntityHasComponentType(jd.sim_joint, gz::sim::components::JointVelocity().TypeId()))
+                ecm.CreateComponent(jd.sim_joint, gz::sim::components::JointVelocity());
 
-            // Create Gazebo components
-            sim::Entity joint_entity = it->second;
-            if (!_ecm.EntityHasComponentType(joint_entity, sim::components::JointPosition().TypeId()))
-            {
-                _ecm.CreateComponent(joint_entity, sim::components::JointPosition());
-            }
-            if (!_ecm.EntityHasComponentType(joint_entity, sim::components::JointVelocity().TypeId()))
-            {
-                _ecm.CreateComponent(joint_entity, sim::components::JointVelocity());
-            }
+            // State interfaces
+            state_interfaces_.emplace_back(name, hardware_interface::HW_IF_POSITION, &jd.position);
+            state_interfaces_.emplace_back(name, hardware_interface::HW_IF_VELOCITY, &jd.velocity);
 
-            // Setup interfaces
-            for (const auto &interface : joint_info.state_interfaces)
-            {
-                if (interface.name == hardware_interface::HW_IF_POSITION)
-                {
-                    state_interfaces_.emplace_back(joint_name, hardware_interface::HW_IF_POSITION,
-                                                   &joints_[joint_name].position);
-                }
-                else if (interface.name == hardware_interface::HW_IF_VELOCITY)
-                {
-                    state_interfaces_.emplace_back(joint_name, hardware_interface::HW_IF_VELOCITY,
-                                                   &joints_[joint_name].velocity);
-                }
-                else if (interface.name == hardware_interface::HW_IF_EFFORT)
-                {
-                    state_interfaces_.emplace_back(joint_name, hardware_interface::HW_IF_EFFORT,
-                                                   &joints_[joint_name].effort);
-                }
-            }
+            // Velocity command interface only
+            command_interfaces_.emplace_back(name, hardware_interface::HW_IF_VELOCITY, &jd.velocity_command);
 
-            for (const auto &interface : joint_info.command_interfaces)
-            {
-                if (interface.name == hardware_interface::HW_IF_POSITION)
-                {
-                    command_interfaces_.emplace_back(joint_name, hardware_interface::HW_IF_POSITION,
-                                                     &joints_[joint_name].position_command);
-                }
-                else if (interface.name == hardware_interface::HW_IF_VELOCITY)
-                {
-                    command_interfaces_.emplace_back(joint_name, hardware_interface::HW_IF_VELOCITY,
-                                                     &joints_[joint_name].velocity_command);
-                }
-                else if (interface.name == hardware_interface::HW_IF_EFFORT)
-                {
-                    command_interfaces_.emplace_back(joint_name, hardware_interface::HW_IF_EFFORT,
-                                                     &joints_[joint_name].effort_command);
-                }
-            }
-
-            RCLCPP_INFO(this->nh_->get_logger(), "Joint initialized: %s", joint_name.c_str());
+            RCLCPP_INFO(nh_->get_logger(), "Joint ready: %s", name.c_str());
         }
 
-        RCLCPP_INFO(this->nh_->get_logger(), "Hardware interface ready - %zu joints", joints_.size());
+        RCLCPP_INFO(nh_->get_logger(), "Hardware interface ready - %zu joints", joints_.size());
         return true;
     }
 
-    hardware_interface::CallbackReturn PropArmHardware::on_init(
-        const hardware_interface::HardwareInfo &info)
+    hardware_interface::CallbackReturn
+    PropArmHardware::on_init(const hardware_interface::HardwareInfo &info)
     {
-        if (hardware_interface::SystemInterface::on_init(info) != hardware_interface::CallbackReturn::SUCCESS)
-        {
-            return hardware_interface::CallbackReturn::ERROR;
-        }
-        return hardware_interface::CallbackReturn::SUCCESS;
+        return (hardware_interface::SystemInterface::on_init(info) ==
+                hardware_interface::CallbackReturn::SUCCESS)
+                   ? hardware_interface::CallbackReturn::SUCCESS
+                   : hardware_interface::CallbackReturn::ERROR;
     }
 
     std::vector<hardware_interface::StateInterface> PropArmHardware::export_state_interfaces()
     {
-        return std::move(state_interfaces_);
+        return std::move(state_interfaces_); // exported once
     }
 
     std::vector<hardware_interface::CommandInterface> PropArmHardware::export_command_interfaces()
     {
-        return std::move(command_interfaces_);
+        return std::move(command_interfaces_); // exported once
     }
 
-    hardware_interface::CallbackReturn PropArmHardware::on_activate(
-        const rclcpp_lifecycle::State &)
+    hardware_interface::CallbackReturn
+    PropArmHardware::on_activate(const rclcpp_lifecycle::State &)
     {
-        RCLCPP_INFO(rclcpp::get_logger("PropArmHardware"), "Activating PropArm Hardware");
-
-        // Initialize all commands to zero
-        for (auto &[joint_name, joint_data] : joints_)
+        for (auto &kv : joints_)
         {
-            joint_data.position = 0.0;
-            joint_data.velocity = 0.0;
-            joint_data.effort = 0.0;
-            joint_data.velocity_command = 0.0;
-            joint_data.position_command = 0.0;
-            joint_data.effort_command = 0.0;
-            joint_data.last_effort_command = 0.0;
-            joint_data.last_velocity_command = 0.0;
-            joint_data.last_position_command = 0.0;
+            kv.second.position = 0.0;
+            kv.second.velocity = 0.0;
+            kv.second.velocity_command = 0.0;
         }
 
-        // Send initial zero command
-        gz::msgs::Actuators actuators_msg;
-        actuators_msg.add_velocity(0.0);
-        actuators_pub_.Publish(actuators_msg);
+        // Publish 0 rad/s at the configured actuator index
+        gz::msgs::Actuators msg;
+        msg.mutable_velocity()->Resize(actuator_index_ + 1, 0.0);
+        actuators_pub_.Publish(msg);
 
+        RCLCPP_INFO(rclcpp::get_logger("PropArmHardware"), "Activated.");
         return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    hardware_interface::CallbackReturn PropArmHardware::on_deactivate(
-        const rclcpp_lifecycle::State &)
+    hardware_interface::CallbackReturn
+    PropArmHardware::on_deactivate(const rclcpp_lifecycle::State &)
     {
-        RCLCPP_INFO(rclcpp::get_logger("PropArmHardware"), "Deactivating PropArm Hardware");
-
-        // Stop motor
-        gz::msgs::Actuators actuators_msg;
-        actuators_msg.add_velocity(0.0);
-        actuators_pub_.Publish(actuators_msg);
-
+        gz::msgs::Actuators msg;
+        msg.mutable_velocity()->Resize(actuator_index_ + 1, 0.0);
+        actuators_pub_.Publish(msg);
+        RCLCPP_INFO(rclcpp::get_logger("PropArmHardware"), "Deactivated (motor stopped).");
         return hardware_interface::CallbackReturn::SUCCESS;
     }
 
-    double PropArmHardware::mitToGazeboAngle(double mit_angle) const
+    hardware_interface::return_type
+    PropArmHardware::read(const rclcpp::Time &, const rclcpp::Duration &)
     {
-        return mit_angle; // No conversion needed with corrected URDF
-    }
-
-    double PropArmHardware::gazeboToMitAngle(double gazebo_angle) const
-    {
-        return gazebo_angle; // No conversion needed with corrected URDF
-    }
-
-    void PropArmHardware::updateElectroMechanicalModel(const std::string &joint_name,
-                                                       double motor_command, double dt)
-    {
-        auto &joint = joints_[joint_name];
-
-        // Simplified model: motor command directly controls thrust
-        motor_command = std::max(0.0, motor_command); // Positive only
-
-        // Convert motor speed to force (F = k * ω²)
-        double k_motor = 0.008;
-        double thrust_force = k_motor * motor_command * motor_command;
-
-        // Update effort for state interface
-        joint.effort = thrust_force;
-    }
-
-    hardware_interface::return_type PropArmHardware::read(
-        const rclcpp::Time &, const rclcpp::Duration &)
-    {
-        // Read joint states from Gazebo
-        for (auto &[joint_name, joint_data] : joints_)
+        for (auto &kv : joints_)
         {
-            if (joint_data.sim_joint == sim::kNullEntity)
+            auto &jd = kv.second;
+            if (jd.sim_joint == sim::kNullEntity)
                 continue;
 
-            // Get position
-            const auto *jointPositions = ecm_->Component<sim::components::JointPosition>(joint_data.sim_joint);
-            if (jointPositions && jointPositions->Data().size() > 0)
-            {
-                joint_data.position = gazeboToMitAngle(jointPositions->Data()[0]);
-            }
+            const auto *pos = ecm_->Component<gz::sim::components::JointPosition>(jd.sim_joint);
+            if (pos && !pos->Data().empty())
+                jd.position = pos->Data()[0];
 
-            // Get velocity
-            const auto *jointVelocity = ecm_->Component<sim::components::JointVelocity>(joint_data.sim_joint);
-            if (jointVelocity && jointVelocity->Data().size() > 0)
-            {
-                joint_data.velocity = jointVelocity->Data()[0];
-            }
+            const auto *vel = ecm_->Component<gz::sim::components::JointVelocity>(jd.sim_joint);
+            if (vel && !vel->Data().empty())
+                jd.velocity = vel->Data()[0];
         }
-
         return hardware_interface::return_type::OK;
     }
 
-    hardware_interface::return_type PropArmHardware::write(
-        const rclcpp::Time &, const rclcpp::Duration &period)
+    hardware_interface::return_type
+    PropArmHardware::write(const rclcpp::Time &, const rclcpp::Duration &period)
     {
-        for (auto &[joint_name, joint_data] : joints_)
+        double dt = period.seconds();
+        dt = std::max(0.0, dt);
+
+        double motor_cmd = 0.0;
+        if (!joints_.empty())
         {
-            if (joint_data.sim_joint == sim::kNullEntity)
-                continue;
-
-            double motor_command = 0.0;
-            bool command_received = false;
-
-            // Check for command changes
-            bool effort_changed = (std::abs(joint_data.effort_command - joint_data.last_effort_command) > 1e-6);
-            bool velocity_changed = (std::abs(joint_data.velocity_command - joint_data.last_velocity_command) > 1e-6);
-
-<<<<<<< HEAD
-            // Priority: Effort > Velocity (SIMPLIFIED - no position control here)
-            if (std::abs(joint_data.effort_command) > 1e-6 || effort_changed)
-            {
-                // Force mode - convert to motor speed
-                double force_command = std::max(0.0, joint_data.effort_command);
-
-                if (force_command > 0.001)
-                {
-                    double k_motor = 0.008;
-                    motor_command = std::sqrt(force_command / k_motor);
-                }
-
-                command_received = true;
-                joint_data.last_effort_command = joint_data.effort_command;
-
-                RCLCPP_DEBUG(rclcpp::get_logger("PropArmHardware"),
-                             "Effort mode: %.2fN -> %.2f rad/s", force_command, motor_command);
-            }
-            else if (std::abs(joint_data.velocity_command) > 1e-6 || velocity_changed)
-            {
-                // Direct velocity mode
-                motor_command = std::max(0.0, joint_data.velocity_command);
-=======
-            // Priority: Velocity > Effort (for angle hold controller)
-            if (std::abs(joint_data.velocity_command) > 1e-6 || velocity_changed)
-            {
-                // Direct velocity mode - this is what the angle controller uses
-                motor_command = joint_data.velocity_command;
-
-                // Ensure positive motor velocity (physical constraint)
-                motor_command = std::max(0.0, motor_command);
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
-                command_received = true;
-                joint_data.last_velocity_command = joint_data.velocity_command;
-
-                RCLCPP_DEBUG(rclcpp::get_logger("PropArmHardware"),
-                             "Velocity mode: %.2f rad/s", motor_command);
-<<<<<<< HEAD
-=======
-            }
-            else if (std::abs(joint_data.effort_command) > 1e-6 || effort_changed)
-            {
-                // Force mode - convert to motor speed
-                double force_command = std::max(0.0, joint_data.effort_command);
-
-                if (force_command > 0.001)
-                {
-                    double k_motor = 0.008; // F = k * omega^2
-                    motor_command = std::sqrt(force_command / k_motor);
-                }
-
-                command_received = true;
-                joint_data.last_effort_command = joint_data.effort_command;
-
-                RCLCPP_DEBUG(rclcpp::get_logger("PropArmHardware"),
-                             "Effort mode: %.2fN -> %.2f rad/s", force_command, motor_command);
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
-            }
-
-            // Send command to motor
-            if (command_received)
-            {
-<<<<<<< HEAD
-=======
-                // Apply motor speed limits
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
-                motor_command = std::max(0.0, std::min(785.0, motor_command));
-
-                gz::msgs::Actuators actuators_msg;
-                actuators_msg.add_velocity(motor_command);
-                bool success = actuators_pub_.Publish(actuators_msg);
-
-                if (!success)
-                {
-                    RCLCPP_WARN_THROTTLE(rclcpp::get_logger("PropArmHardware"),
-                                         *nh_->get_clock(), 1000,
-                                         "Failed to publish motor command");
-                }
-
-                // Update electro-mechanical model
-                updateElectroMechanicalModel(joint_name, motor_command, period.seconds());
-            }
-            else
-            {
-<<<<<<< HEAD
-                // No command - send zero
-=======
-                // No command - send zero to stop motor
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
-                gz::msgs::Actuators actuators_msg;
-                actuators_msg.add_velocity(0.0);
-                actuators_pub_.Publish(actuators_msg);
-
-                // Update model with zero command
-                updateElectroMechanicalModel(joint_name, 0.0, period.seconds());
-            }
+            const auto &jd = joints_.begin()->second;
+            motor_cmd = std::clamp(jd.velocity_command, 0.0, max_rot_vel_);
         }
 
+        // First-order response to command, matching plugin's idea:
+        const double tau = (motor_cmd >= motor_speed_est_) ? tau_up_ : tau_down_;
+        const double alpha = (tau > 0.0) ? dt / (tau + dt) : 1.0;
+        motor_speed_est_ += alpha * (motor_cmd - motor_speed_est_);
+        motor_speed_est_ = std::clamp(motor_speed_est_, 0.0, max_rot_vel_);
+
+        // Publish motor speed to ROS for your VEmfPublisher
+        std_msgs::msg::Float64 spd;
+        spd.data = motor_speed_est_;
+        motor_speed_pub_->publish(spd);
+
+        // Publish arm angle in degrees
+        auto arm_joint_it = joints_.find("arm_link_joint");
+        if (arm_joint_it != joints_.end())
+        {
+            std_msgs::msg::Float64 arm_angle_msg;
+            // Convert from radians to degrees
+            arm_angle_msg.data = arm_joint_it->second.position * 180.0 / M_PI;
+            arm_angle_pub_->publish(arm_angle_msg);
+        }
+
+        // Still send the actual command to Gazebo
+        gz::msgs::Actuators msg;
+        msg.mutable_velocity()->Resize(actuator_index_ + 1, 0.0);
+        msg.set_velocity(actuator_index_, motor_cmd);
+        if (!actuators_pub_.Publish(msg))
+        {
+            RCLCPP_WARN_THROTTLE(rclcpp::get_logger("PropArmHardware"), *nh_->get_clock(), 1000,
+                                 "Failed to publish motor command");
+        }
         return hardware_interface::return_type::OK;
     }
 
 } // namespace prop_arm_gazebo_control
 
 #include "pluginlib/class_list_macros.hpp"
-PLUGINLIB_EXPORT_CLASS(
-    prop_arm_gazebo_control::PropArmHardware,
-    gz_ros2_control::GazeboSimSystemInterface)
+PLUGINLIB_EXPORT_CLASS(prop_arm_gazebo_control::PropArmHardware,
+                       gz_ros2_control::GazeboSimSystemInterface)

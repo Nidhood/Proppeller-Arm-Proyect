@@ -11,82 +11,15 @@ controller_manager:
       joints: [arm_link_joint]
       interface_name: velocity
 
-    motor_force_controller:
-      type: forward_command_controller/ForwardCommandController
-      joints: [arm_link_joint]
-      interface_name: effort
-
-<<<<<<< HEAD
-    # Optional position controller for future use
-    position_controller:
-      type: position_controllers/JointGroupPositionController
-
-# Joint state broadcaster configuration
-=======
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
 joint_state_broadcaster:
   ros__parameters:
     use_sim_time: true
     joints: [arm_link_joint]
-    interfaces: [position, velocity, effort]
+    interfaces: [position, velocity]
     publish_rate: 100.0
 
-<<<<<<< HEAD
-# PRIMARY CONTROLLER: Direct motor force/thrust control with corrected limits
-motor_force_controller:
-  ros__parameters:
-    use_sim_time: true
-    joints: [arm_link_joint]
-    command_interfaces: [effort]
-
-    # CORRECTED force limits for realistic propeller thrust
-    effort_limits:
-      arm_link_joint:
-        min: 0.0 # CRITICAL: No negative thrust (realistic propeller)
-        max: 45.0 # Increased maximum for sufficient lifting force
-
-    # PID parameters for effort controller (optional, can be disabled)
-    gains:
-      arm_link_joint:
-        p: 0.0 # Disable internal PID to avoid conflicts
-        i: 0.0
-        d: 0.0
-
-# SECONDARY CONTROLLER: Direct velocity control
-=======
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
 velocity_controller:
   ros__parameters:
     use_sim_time: true
     joints: [arm_link_joint]
-<<<<<<< HEAD
-    command_interfaces: [velocity]
-
-    # Velocity limits matching motor specifications
-    velocity_limits:
-      arm_link_joint:
-        min: 0.0 # Positive only for realistic propeller
-        max: 785.0 # Maximum motor speed from Gazebo plugin
-
-# BACKUP CONTROLLER: Position control for angle commands
-position_controller:
-  ros__parameters:
-    use_sim_time: true
-    joints: [arm_link_joint]
-    command_interfaces: [position]
-
-    # Position limits for safety (-90° to +90° in radians)
-    position_limits:
-      arm_link_joint:
-        min: -1.5708 # -90 degrees
-        max: 1.5708 # +90 degrees
-
-    # PID gains for position control
-    gains:
-      arm_link_joint:
-        p: 50.0 # Moderate proportional gain
-        i: 2.0 # Small integral to reduce steady-state error
-        d: 15.0 # Derivative for damping
-=======
     interface_name: velocity
->>>>>>> 428d4d5 (Add angle hold controller and refactor motor commander)
