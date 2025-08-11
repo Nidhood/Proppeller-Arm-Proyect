@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# ---------------------------- PYTHON IMPORTS ----------------------------
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, TimerAction, OpaqueFunction
 from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 
+
+# ---------------------- LAUNCH DESCRIPTION ----------------------
 def launch_setup(context, *args, **kwargs):
     use_sim_time = LaunchConfiguration('use_sim_time')
 

@@ -1,0 +1,58 @@
+prop_arm_gui_node:
+  ros__parameters:
+    # Control limits
+    max_angle_deg: 90.0
+    min_angle_deg: -90.0
+    max_force_n: 45.0
+    max_velocity_rad_s: 785.0
+
+    # Target parameters
+    target_angle_deg: 0.0
+
+    # Update rates
+    gui_update_rate_hz: 20.0
+    plot_update_rate_hz: 10.0
+    ros_spin_rate_hz: 100.0
+
+    # Plot settings
+    plot_time_window_sec: 30.0
+    max_plot_points: 1000
+
+    # Connection settings
+    connection_timeout_sec: 2.0
+
+    # Topic names
+    topics:
+      arm_angle: "/prop_arm/arm_angle_deg"
+      motor_speed: "/prop_arm/motor_speed_est"
+      v_emf: "/prop_arm/v_emf"
+      delta_v_emf: "/prop_arm/delta_v_emf"
+      velocity_cmd: "/velocity_controller/commands"
+      force_cmd: "/motor_force_controller/commands"
+
+    # GUI appearance
+    theme: "dark"
+    window:
+      width: 1600
+      height: 1000
+      min_width: 1200
+      min_height: 800
+
+    # Dashboard settings
+    dashboard:
+      animation_fps: 30
+      smoothing_factor: 0.15
+      show_grid: true
+      show_statistics: true
+
+    # Colors (aerospace theme)
+    colors:
+      primary: "#1e3a8a" # Deep blue
+      secondary: "#3b82f6" # Lighter blue
+      success: "#10b981" # Green
+      warning: "#f59e0b" # Orange
+      danger: "#ef4444" # Red
+      background: "#0f172a" # Dark slate
+      card: "#1e293b" # Slate 800
+      text: "#f1f5f9" # Light text
+      accent: "#06b6d4" # Cyan

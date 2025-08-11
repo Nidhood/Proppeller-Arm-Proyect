@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+    <name>prop_arm_gui</name>
+    <version>1.0.0</version>
+    <description>Modern aerospace-style GUI for PropArm control system</description>
+    <maintainer email="ivan.oroz34@gmail.com">Nidhood</maintainer>
+    <license>BSD-3-Clause</license>
+
+    <buildtool_depend>ament_cmake</buildtool_depend>
+
+    <!-- ROS2 dependencies -->
+    <depend>rclcpp</depend>
+    <depend>std_msgs</depend>
+    <depend>sensor_msgs</depend>
+    <depend>geometry_msgs</depend>
+    <depend>tf2</depend>
+    <depend>tf2_ros</depend>
+
+    <!-- Qt6 dependencies for ROS2 Jazzy -->
+    <build_depend>libqt6core6</build_depend>
+    <build_depend>libqt6gui6</build_depend>
+    <build_depend>libqt6widgets6</build_depend>
+    <build_depend>libqt6charts6-dev</build_depend>
+    <build_depend>qt6-base-dev</build_depend>
+
+    <exec_depend>libqt6core6</exec_depend>
+    <exec_depend>libqt6gui6</exec_depend>
+    <exec_depend>libqt6widgets6</exec_depend>
+    <exec_depend>libqt6charts6</exec_depend>
+
+    <!-- Launch dependencies -->
+    <exec_depend>launch_ros</exec_depend>
+    <exec_depend>launch</exec_depend>
+
+    <!-- Test dependencies -->
+    <test_depend>ament_lint_auto</test_depend>
+    <test_depend>ament_lint_common</test_depend>
+
+    <export>
+        <build_type>ament_cmake</build_type>
+    </export>
+</package>
