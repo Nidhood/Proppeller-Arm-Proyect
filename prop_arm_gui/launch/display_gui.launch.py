@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
+# -------------------------- LAUNCH DEPENDENCIES -------------------------
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo, GroupAction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -8,6 +10,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 import os
 
+# ---------------------- LAUNCH DESCRIPTION ----------------------
 def generate_launch_description():
     return LaunchDescription([
         # Launch arguments
