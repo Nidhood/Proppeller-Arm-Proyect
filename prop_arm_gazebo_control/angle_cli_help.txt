@@ -1,0 +1,76 @@
+ROS 2 CLI Cheat Sheet — angle_hold_ss_controller
+==================================================
+
+Command (example)
+-----------------
+ros2 run prop_arm_gazebo_control angle_hold_ss_controller   --ros-args   -p theta_ref_deg:=20.0   -p omega0_rad_s:=400.0   -p K:="[15.0,8.0,2.0]"   -p tau:=0.01   -p u_max:=785.0
+
+Breakdown
+---------
+ros2 run
+    Launch a node from a given package.
+
+prop_arm_gazebo_control
+    The ROS 2 package name that contains the executable.
+
+angle_hold_ss_controller
+    The node/executable name.
+
+--ros-args
+    Marker that introduces ROS-specific arguments (remapping, parameters, logging).
+    Everything after this flag is consumed by the ROS client libraries.
+
+-p theta_ref_deg:=<float>
+    Desired arm angle setpoint in DEGREES (e.g., 20.0).
+
+-p omega0_rad_s:=<float>
+    Nominal/hover rotor speed in radians per second (e.g., 400.0).
+
+-p K:="[k1,k2,k3]"
+    State-feedback gains as a list of 3 numbers. Lists must be written in YAML
+    form and quoted so the shell does not split them (e.g., "[15.0,8.0,2.0]").
+
+-p tau:=<float>
+    First-order time constant (seconds) used by the internal motor/speed model.
+
+-p u_max:=<float>
+    Saturation limit for the motor speed command (rad/s).
+
+Common Variations
+-----------------
+# Change the setpoint to 45 degrees and increase nominal speed
+ros2 run prop_arm_gazebo_control angle_hold_ss_controller --ros-args   -p theta_ref_deg:=45.0 -p omega0_rad_s:=500.0 -p K:="[15.0,8.0,2.0]" -p tau:=0.02 -p u_max:=900.0
+
+# Run the node in a namespace (so topics/params live under /prop_arm)
+ros2 run prop_arm_gazebo_control angle_hold_ss_controller --ros-args   -r __ns:=/prop_arm   -p theta_ref_deg:=30.0 -p omega0_rad_s:=400.0 -p K:="[12.0,6.0,1.5]" -p tau:=0.01 -p u_max:=785.0
+
+# Use a YAML file for parameters (recommended for repeatability)
+# params.yaml
+# angle_hold_ss_controller:
+#   ros__parameters:
+#     theta_ref_deg: 20.0
+#     omega0_rad_s: 400.0
+#     K: [15.0, 8.0, 2.0]
+#     tau: 0.01
+#     u_max: 785.0
+#
+ros2 run prop_arm_gazebo_control angle_hold_ss_controller --ros-args --params-file params.yaml
+
+# Inspect parameters at runtime
+ros2 param list
+ros2 param get /angle_hold_ss_controller theta_ref_deg
+ros2 param set /angle_hold_ss_controller theta_ref_deg 10.0
+
+Troubleshooting
+---------------
+• If you see parsing errors for K, ensure the list is quoted: K:="[a,b,c]"
+• If the node rejects a parameter ("parameter not declared"), check that the node
+  declares that parameter name and type, or run with 'allow_undeclared_parameters'
+  (not recommended for production).
+• If settings appear ignored, confirm you placed '--ros-args' before '-p' assignments.
+• Use 'ros2 param describe <node> <name>' to check expected types.
+
+Notes
+-----
+• Units: theta_ref_deg is degrees; omega0_rad_s and u_max are in rad/s; tau is seconds.
+• You can combine '-r' remappings with parameters under the same '--ros-args' block.
