@@ -51,9 +51,6 @@ signals:
     void connectionChanged(bool connected);
     void errorOccurred(const QString &error);
 
-private slots:
-    void processRosEvents();
-
 private:
     void setupSubscribers();
     void setupPublishers();
@@ -82,7 +79,6 @@ private:
     static constexpr size_t MAX_HISTORY_SIZE = 5000;
 
     // Connection management
-    QTimer *ros_timer_;
     rclcpp::Time last_data_time_;
     bool connected_ = false;
     std::string control_mode_ = "Manual";

@@ -3,11 +3,38 @@
 #include <QDir>
 #include <QStandardPaths>
 #include <QMessageBox>
+#include <QThread>
+#include <QSurfaceFormat>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/executors/single_threaded_executor.hpp>
 #include <memory>
+#include <thread>
 
 #include "prop_arm_gui/main_window.hpp"
 #include "prop_arm_gui/prop_arm_gui_node.hpp"
+
+// Global executor for ROS2
+std::shared_ptr<rclcpp::executors::SingleThreadedExecutor> g_executor;
+std::shared_ptr<PropArmGuiNode> g_ros_node;
+std::thread g_ros_thread;
+std::atomic<bool> g_shutdown{false};
+
+void rosThreadFunc()
+{
+    while (rclcpp::ok() && !g_shutdown.load())
+    {
+        try
+        {
+            g_executor->spin_some(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        catch (const std::exception &e)
+        {
+            RCLCPP_ERROR(g_ros_node->get_logger(), "ROS thread exception: %s", e.what());
+            break;
+        }
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -15,6 +42,17 @@ int main(int argc, char **argv)
     {
         // Initialize ROS2 first
         rclcpp::init(argc, argv);
+
+        // Configure OpenGL surface format for Qt6 compatibility
+        QSurfaceFormat format;
+        format.setDepthBufferSize(24);
+        format.setStencilBufferSize(8);
+        format.setVersion(3, 3);
+        format.setProfile(QSurfaceFormat::CoreProfile);
+        format.setSamples(4); // Anti-aliasing
+        format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+        format.setRenderableType(QSurfaceFormat::OpenGL);
+        QSurfaceFormat::setDefaultFormat(format);
 
         // Initialize Qt Application
         QApplication app(argc, argv);
@@ -24,9 +62,6 @@ int main(int argc, char **argv)
         app.setApplicationVersion("1.0.0");
         app.setOrganizationName("Aerospace Robotics Lab");
         app.setApplicationDisplayName("PropArm Aerospace GUI");
-
-        // Remove deprecated high DPI attributes for Qt6
-        // These are now enabled by default and don't need to be set
 
         // Set dark fusion style for modern aerospace look
         app.setStyle(QStyleFactory::create("Fusion"));
@@ -50,41 +85,88 @@ int main(int argc, char **argv)
 
         // Create ROS2 node with error checking
         auto node_options = rclcpp::NodeOptions();
-        auto ros_node = std::make_shared<PropArmGuiNode>(node_options);
+        g_ros_node = std::make_shared<PropArmGuiNode>(node_options);
 
-        if (!ros_node)
+        if (!g_ros_node)
         {
             QMessageBox::critical(nullptr, "Error", "Failed to create ROS2 node");
             return 1;
         }
 
+        // Create executor and add node
+        g_executor = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+        g_executor->add_node(g_ros_node);
+
+        // Start ROS2 in separate thread
+        g_ros_thread = std::thread(rosThreadFunc);
+
         // Create main window
-        MainWindow window(ros_node);
+        MainWindow window(g_ros_node);
+
+        // Ensure window is visible and properly displayed
         window.show();
+        window.raise();
+        window.activateWindow();
+
+// Force window to front on Ubuntu/X11
+#ifdef Q_OS_LINUX
+        window.setWindowState(window.windowState() | Qt::WindowActive);
+#endif
 
         // Setup graceful shutdown
         QObject::connect(&app, &QApplication::aboutToQuit, [&]()
                          {
-            RCLCPP_INFO(ros_node->get_logger(), "Shutting down PropArm GUI...");
+            RCLCPP_INFO(g_ros_node->get_logger(), "Shutting down PropArm GUI...");
+            
+            // Signal shutdown
+            g_shutdown.store(true);
+            
+            // Wait for ROS thread
+            if (g_ros_thread.joinable()) {
+                g_ros_thread.join();
+            }
+            
+            // Remove node from executor
+            if (g_executor && g_ros_node) {
+                g_executor->remove_node(g_ros_node);
+            }
+            
+            // Shutdown ROS
             rclcpp::shutdown(); });
 
         // Log startup information
-        RCLCPP_INFO(ros_node->get_logger(),
+        RCLCPP_INFO(g_ros_node->get_logger(),
                     "PropArm Aerospace GUI started successfully");
-        RCLCPP_INFO(ros_node->get_logger(),
+        RCLCPP_INFO(g_ros_node->get_logger(),
                     "Monitoring topics: %s, %s",
                     "/prop_arm/arm_angle_deg", "/prop_arm/motor_speed_est");
-        RCLCPP_INFO(ros_node->get_logger(),
+        RCLCPP_INFO(g_ros_node->get_logger(),
                     "Publishing to: %s, %s",
                     "/velocity_controller/commands", "/motor_force_controller/commands");
+
+        // Process pending events before starting main loop
+        app.processEvents();
 
         // Run the application
         int result = app.exec();
 
         // Cleanup
-        RCLCPP_INFO(ros_node->get_logger(), "GUI closed, cleaning up...");
+        RCLCPP_INFO(g_ros_node->get_logger(), "GUI closed, cleaning up...");
 
-        // Ensure ROS is properly shut down
+        // Signal shutdown and wait for ROS thread
+        g_shutdown.store(true);
+        if (g_ros_thread.joinable())
+        {
+            g_ros_thread.join();
+        }
+
+        // Cleanup executor
+        if (g_executor && g_ros_node)
+        {
+            g_executor->remove_node(g_ros_node);
+        }
+
+        // Final ROS shutdown
         if (rclcpp::ok())
         {
             rclcpp::shutdown();
@@ -103,6 +185,18 @@ int main(int argc, char **argv)
                                   QString("Exception occurred: %1").arg(e.what()));
         }
 
+        // Cleanup on exception
+        g_shutdown.store(true);
+        if (g_ros_thread.joinable())
+        {
+            g_ros_thread.join();
+        }
+
+        if (rclcpp::ok())
+        {
+            rclcpp::shutdown();
+        }
+
         return 1;
     }
     catch (...)
@@ -114,6 +208,18 @@ int main(int argc, char **argv)
         {
             QMessageBox::critical(nullptr, "Fatal Error",
                                   "Unknown exception occurred");
+        }
+
+        // Cleanup on exception
+        g_shutdown.store(true);
+        if (g_ros_thread.joinable())
+        {
+            g_ros_thread.join();
+        }
+
+        if (rclcpp::ok())
+        {
+            rclcpp::shutdown();
         }
 
         return 1;

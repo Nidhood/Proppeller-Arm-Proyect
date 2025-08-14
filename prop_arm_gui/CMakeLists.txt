@@ -20,7 +20,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 # Qt6 dependencies with proper components
-find_package(Qt6 REQUIRED COMPONENTS Core Widgets Charts)
+find_package(Qt6 REQUIRED COMPONENTS Core Widgets Charts OpenGL)
 
 # Automatically handle Qt's MOC, RCC and UIC
 set(CMAKE_AUTOMOC ON)
@@ -30,29 +30,29 @@ set(CMAKE_AUTOUIC ON)
 # Include directories
 include_directories(include)
 
-# Qt6 executable
+# Qt6 executable sources - CLEANED UP (removed dashboard components)
 set(GUI_SOURCES
     src/main.cpp
     src/main_window.cpp
     src/prop_arm_gui_node.cpp
     src/real_time_plot.cpp
-    src/aerospace_dashboard.cpp
+    src/aerospace_data_visualizer.cpp
 )
 
 set(GUI_HEADERS
     include/prop_arm_gui/main_window.hpp
     include/prop_arm_gui/prop_arm_gui_node.hpp
     include/prop_arm_gui/real_time_plot.hpp
-    include/prop_arm_gui/aerospace_dashboard.hpp
+    include/prop_arm_gui/aerospace_data_visualizer.hpp
 )
 
-# Create executable - CHANGED: executable name to match launch file
+# Create executable
 add_executable(prop_arm_gui
     ${GUI_SOURCES}
     ${GUI_HEADERS}
 )
 
-# ROS dependencies - CHANGED: target name
+# ROS dependencies
 ament_target_dependencies(prop_arm_gui
     rclcpp
     std_msgs
@@ -62,17 +62,23 @@ ament_target_dependencies(prop_arm_gui
     tf2_ros
 )
 
-# Qt6 libraries - link in correct order - CHANGED: target name
+# Qt6 libraries
 target_link_libraries(prop_arm_gui
     Qt6::Core
     Qt6::Widgets
     Qt6::Charts
+    Qt6::OpenGL
 )
 
-# Ensure Qt6 definitions are applied - CHANGED: target name
-target_compile_definitions(prop_arm_gui PRIVATE QT_CHARTS_LIB)
+# Ensure Qt6 definitions are applied
+target_compile_definitions(prop_arm_gui PRIVATE 
+    QT_CHARTS_LIB
+    QT_WIDGETS_LIB
+    QT_CORE_LIB
+    QT_OPENGL_LIB
+)
 
-# Install targets - CHANGED: target name
+# Install targets
 install(TARGETS prop_arm_gui
     DESTINATION lib/${PROJECT_NAME}
 )
@@ -85,6 +91,12 @@ install(DIRECTORY launch
 
 # Install config files
 install(DIRECTORY config
+    DESTINATION share/${PROJECT_NAME}
+    OPTIONAL
+)
+
+# Install resource files (if any)
+install(DIRECTORY resources
     DESTINATION share/${PROJECT_NAME}
     OPTIONAL
 )

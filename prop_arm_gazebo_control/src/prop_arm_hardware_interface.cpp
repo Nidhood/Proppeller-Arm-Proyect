@@ -18,7 +18,7 @@ namespace prop_arm_gazebo_control
         ecm_ = &ecm;
         enabled_joints_ = joints;
 
-        // Parameters from URDF <hardware><param ...>
+        // Parameters from URDF
         if (auto it = hardware_info.hardware_parameters.find("robot_namespace");
             it != hardware_info.hardware_parameters.end())
             robot_namespace_ = it->second;
