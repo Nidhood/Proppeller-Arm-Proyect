@@ -2,7 +2,7 @@ prop_arm_gui_node:
   ros__parameters:
     # Control limits
     max_angle_deg: 90.0
-    min_angle_deg: -90.0
+    min_angle_deg: 0.0
     max_force_n: 45.0
     max_velocity_rad_s: 785.0
 
@@ -14,9 +14,51 @@ prop_arm_gui_node:
     plot_update_rate_hz: 10.0
     ros_spin_rate_hz: 100.0
 
-    # Plot settings
-    plot_time_window_sec: 30.0
-    max_plot_points: 1000
+    # Visualization settings (ACTUALLY USED NOW)
+    visualization:
+      time_window_sec: 60.0
+      max_plot_points: 2000
+      update_rate_ms: 50
+      smooth_transitions: true
+      show_grid: true
+
+      # Chart specific settings
+      charts:
+        arm_angle:
+          auto_scale: false
+          y_min: -95.0
+          y_max: 95.0
+          color: "#00ffcc" # NEON_CYAN
+
+        control_error:
+          auto_scale: true
+          y_min: -10.0
+          y_max: 10.0
+          color: "#ff5050" # NEON_RED
+
+        motor_speed:
+          auto_scale: false
+          y_min: 0.0
+          y_max: 850.0
+          color: "#32ff64" # NEON_GREEN
+
+        motor_command:
+          auto_scale: false
+          y_min: -850.0
+          y_max: 850.0
+          color: "#b464ff" # NEON_PURPLE
+
+        v_emf:
+          auto_scale: true
+          y_min: -25.0
+          y_max: 25.0
+          color: "#ff9600" # NEON_ORANGE
+
+        delta_v_emf:
+          auto_scale: true
+          y_min: -8.0
+          y_max: 8.0
+          color: "#0096ff" # NEON_BLUE
 
     # Connection settings
     connection_timeout_sec: 2.0
@@ -31,28 +73,23 @@ prop_arm_gui_node:
       force_cmd: "/motor_force_controller/commands"
 
     # GUI appearance
-    theme: "dark"
+    theme: "aerospace_dark"
     window:
-      width: 1600
-      height: 1000
-      min_width: 1200
-      min_height: 800
+      width: 1920
+      height: 1200
+      min_width: 1600
+      min_height: 1000
+      fullscreen: false
 
-    # Dashboard settings
-    dashboard:
-      animation_fps: 30
-      smoothing_factor: 0.15
-      show_grid: true
-      show_statistics: true
-
-    # Colors (aerospace theme)
+    # Aerospace color scheme
     colors:
-      primary: "#1e3a8a" # Deep blue
-      secondary: "#3b82f6" # Lighter blue
-      success: "#10b981" # Green
-      warning: "#f59e0b" # Orange
-      danger: "#ef4444" # Red
-      background: "#0f172a" # Dark slate
-      card: "#1e293b" # Slate 800
-      text: "#f1f5f9" # Light text
-      accent: "#06b6d4" # Cyan
+      background_dark: "#080a0f"
+      grid_color: "#19232d"
+      text_color: "#dce6f0"
+      neon_blue: "#0096ff"
+      neon_cyan: "#00ffcc"
+      neon_green: "#32ff64"
+      neon_orange: "#ff9600"
+      neon_purple: "#b464ff"
+      neon_red: "#ff5050"
+      accent_glow: "#00c8ff"

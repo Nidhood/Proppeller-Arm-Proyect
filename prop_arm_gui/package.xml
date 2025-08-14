@@ -17,17 +17,27 @@
     <depend>tf2</depend>
     <depend>tf2_ros</depend>
 
-    <!-- Qt6 dependencies for ROS2 Jazzy -->
+    <!-- Qt6 build dependencies for ROS2 Jazzy -->
     <build_depend>libqt6core6</build_depend>
     <build_depend>libqt6gui6</build_depend>
     <build_depend>libqt6widgets6</build_depend>
     <build_depend>libqt6charts6-dev</build_depend>
+    <build_depend>libqt6opengl6-dev</build_depend>
     <build_depend>qt6-base-dev</build_depend>
 
+    <!-- Qt6 runtime dependencies -->
     <exec_depend>libqt6core6</exec_depend>
     <exec_depend>libqt6gui6</exec_depend>
     <exec_depend>libqt6widgets6</exec_depend>
     <exec_depend>libqt6charts6</exec_depend>
+    <exec_depend>libqt6opengl6</exec_depend>
+
+    <!-- System dependencies for proper display -->
+    <build_depend>libgl1-mesa-dev</build_depend>
+    <build_depend>libglu1-mesa-dev</build_depend>
+
+    <exec_depend>libgl1-mesa-glx</exec_depend>
+    <exec_depend>libglu1-mesa</exec_depend>
 
     <!-- Launch dependencies -->
     <exec_depend>launch_ros</exec_depend>

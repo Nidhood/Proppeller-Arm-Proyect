@@ -1,20 +1,18 @@
 #include "prop_arm_gui/main_window.hpp"
+#include "prop_arm_gui/aerospace_data_visualizer.hpp"
 #include <QApplication>
 #include <QStatusBar>
 #include <QMenuBar>
-#include <QToolBar>
 #include <QSplitter>
-#include <QScrollArea>
+#include <QTabWidget>
 #include <QMessageBox>
-#include <QFileDialog>
-#include <QSettings>
 
 MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
     : QMainWindow(parent), ros_node_(node)
 {
-    setWindowTitle("PropArm Control System - Aerospace GUI");
-    setMinimumSize(1200, 800);
-    resize(1600, 1000);
+    setWindowTitle("PropArm Control System - Aerospace Data Visualization");
+    setMinimumSize(1600, 1000);
+    resize(1920, 1200);
 
     setupStyles();
     setupUI();
@@ -44,132 +42,207 @@ void MainWindow::setupUI()
     central_widget_ = new QWidget;
     setCentralWidget(central_widget_);
 
-    main_layout_ = new QGridLayout(central_widget_);
-    main_layout_->setSpacing(10);
-    main_layout_->setContentsMargins(10, 10, 10, 10);
+    // Create main tabbed interface
+    tab_widget_ = new QTabWidget();
+    tab_widget_->setTabPosition(QTabWidget::North);
 
-    setupControlPanel();
-    setupMonitoringPanel();
-    setupPlotsPanel();
+    // Tab 1: Data Visualization (Main focus) - now with configuration support
+    data_visualizer_ = new AerospaceDataVisualizer(ros_node_);
+    tab_widget_->addTab(data_visualizer_, "🚀 Data Visualization");
+
+    // Tab 2: Control Panel (Secondary)
+    control_widget_ = new QWidget();
+    setupControlTab();
+    tab_widget_->addTab(control_widget_, "⚙️ Control Panel");
+
+    // Main layout
+    auto main_layout = new QVBoxLayout(central_widget_);
+    main_layout->setContentsMargins(0, 0, 0, 0);
+    main_layout->addWidget(tab_widget_);
+
     createStatusBar();
 
-    // Create aerospace dashboard
-    dashboard_ = new AerospaceDashboard(this);
-    dashboard_->setMinimumSize(400, 400);
+    // Style the tab widget
+    tab_widget_->setStyleSheet(QString(R"(
+        QTabWidget::pane {
+            border: 2px solid %1;
+            background-color: %2;
+            border-radius: 8px;
+        }
+        QTabBar::tab {
+            background: %3;
+            color: %4;
+            padding: 12px 20px;
+            margin-right: 2px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            font-size: 12pt;
+            font-weight: bold;
+        }
+        QTabBar::tab:selected {
+            background: %1;
+            color: %2;
+        }
+        QTabBar::tab:hover {
+            background: %5;
+        }
+    )")
+                                   .arg(ACCENT_COLOR, BACKGROUND_COLOR, CARD_COLOR, TEXT_COLOR, SECONDARY_COLOR));
+}
 
-    // Layout arrangement
-    main_layout_->addWidget(control_group_, 0, 0, 1, 1);
-    main_layout_->addWidget(monitor_group_, 0, 1, 1, 1);
-    main_layout_->addWidget(dashboard_, 1, 0, 1, 2);
-    main_layout_->addWidget(plots_group_, 2, 0, 1, 2);
+void MainWindow::setupControlTab()
+{
+    auto layout = new QGridLayout(control_widget_);
+    layout->setSpacing(15);
+    layout->setContentsMargins(20, 20, 20, 20);
 
-    // Set column and row stretches
-    main_layout_->setColumnStretch(0, 1);
-    main_layout_->setColumnStretch(1, 1);
-    main_layout_->setRowStretch(0, 0);
-    main_layout_->setRowStretch(1, 1);
-    main_layout_->setRowStretch(2, 1);
+    // Create control groups
+    setupControlPanel();
+    setupMonitoringPanel();
+
+    // Add to layout
+    layout->addWidget(control_group_, 0, 0);
+    layout->addWidget(monitor_group_, 0, 1);
+    layout->setRowStretch(1, 1);
 }
 
 void MainWindow::setupStyles()
 {
+    // Enhanced aerospace theme
     QString main_style = QString(R"(
         QMainWindow {
+            background-color: %1;
+            color: %2;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        QWidget {
             background-color: %1;
             color: %2;
         }
         QGroupBox {
             font-weight: bold;
             border: 2px solid %3;
-            border-radius: 8px;
+            border-radius: 12px;
             margin-top: 1ex;
-            padding-top: 10px;
-            background-color: %4;
+            padding-top: 15px;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %4, stop: 1 %1);
             color: %2;
+            font-size: 13pt;
         }
         QGroupBox::title {
             subcontrol-origin: margin;
-            left: 10px;
-            padding: 0 8px 0 8px;
+            left: 15px;
+            padding: 0 10px 0 10px;
             color: %5;
-            font-size: 12pt;
+            font-size: 14pt;
+            font-weight: bold;
         }
         QPushButton {
-            background-color: %3;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %3, stop: 1 %6);
             border: 2px solid %5;
-            border-radius: 6px;
-            padding: 8px 16px;
+            border-radius: 8px;
+            padding: 12px 20px;
             font-weight: bold;
             color: %2;
-            min-width: 80px;
+            min-width: 100px;
+            font-size: 11pt;
         }
         QPushButton:hover {
-            background-color: %5;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %5, stop: 1 %3);
             color: %1;
+            border: 3px solid %5;
         }
         QPushButton:pressed {
-            background-color: %6;
+            background: %6;
+            border-color: %2;
         }
         QPushButton#stopButton {
-            background-color: %7;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %7, stop: 1 #8b1538);
             border-color: %7;
         }
         QPushButton#stopButton:hover {
-            background-color: #dc2626;
+            background: #dc2626;
+            border: 3px solid %5;
         }
         QSlider::groove:horizontal {
-            border: 1px solid %3;
-            height: 8px;
-            background: %1;
-            border-radius: 4px;
+            border: 2px solid %3;
+            height: 10px;
+            background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                stop: 0 %1, stop: 1 %4);
+            border-radius: 6px;
         }
         QSlider::handle:horizontal {
-            background: %5;
-            border: 2px solid %3;
-            width: 20px;
-            height: 20px;
-            border-radius: 12px;
-            margin: -6px 0;
+            background: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.5,
+                fx: 0.3, fy: 0.3, stop: 0 %5, stop: 1 %3);
+            border: 2px solid %2;
+            width: 24px;
+            height: 24px;
+            border-radius: 14px;
+            margin: -8px 0;
+            border: 3px solid %5;
         }
         QSlider::handle:horizontal:hover {
-            background: %6;
+            background: qradialgradient(cx: 0.5, cy: 0.5, radius: 0.5,
+                fx: 0.3, fy: 0.3, stop: 0 %2, stop: 1 %5);
+            border: 3px solid %5;
         }
         QProgressBar {
             border: 2px solid %3;
-            border-radius: 6px;
+            border-radius: 8px;
             background-color: %1;
             text-align: center;
             font-weight: bold;
             color: %2;
+            font-size: 11pt;
         }
         QProgressBar::chunk {
-            background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
-                stop: 0 %5, stop: 1 %6);
-            border-radius: 4px;
+            background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                stop: 0 %5, stop: 0.5 %6, stop: 1 %5);
+            border-radius: 6px;
+            
         }
         QLabel {
             color: %2;
-            font-size: 11pt;
+            font-size: 12pt;
         }
         QLabel#valueLabel {
-            font-size: 14pt;
+            font-size: 16pt;
             font-weight: bold;
             color: %5;
-            background-color: %1;
-            border: 1px solid %3;
-            border-radius: 4px;
-            padding: 4px 8px;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %1, stop: 1 %4);
+            border: 2px solid %3;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
         }
         QSpinBox, QDoubleSpinBox {
-            background-color: %1;
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %1, stop: 1 %4);
             border: 2px solid %3;
-            border-radius: 4px;
-            padding: 4px;
+            border-radius: 6px;
+            padding: 6px;
             color: %2;
             font-weight: bold;
+            font-size: 11pt;
         }
         QSpinBox:focus, QDoubleSpinBox:focus {
             border-color: %5;
+            border: 3px solid %5;
+        }
+        QStatusBar {
+            background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                stop: 0 %4, stop: 1 %1);
+            border-top: 1px solid %3;
+            color: %2;
+            font-size: 11pt;
+        }
+        QStatusBar::item {
+            border: none;
         }
     )")
                              .arg(BACKGROUND_COLOR, TEXT_COLOR, PRIMARY_COLOR, CARD_COLOR,
@@ -180,12 +253,20 @@ void MainWindow::setupStyles()
 
 void MainWindow::setupControlPanel()
 {
-    control_group_ = new QGroupBox("Control Panel");
+    control_group_ = new QGroupBox("🎮 CONTROL INTERFACE");
     auto layout = new QVBoxLayout(control_group_);
+    layout->setSpacing(15);
 
-    // Angle control
-    auto angle_layout = new QHBoxLayout();
-    angle_layout->addWidget(new QLabel("Angle (°):"));
+    // Angle control with enhanced styling
+    auto angle_frame = new QFrame();
+    angle_frame->setFrameStyle(QFrame::StyledPanel);
+    auto angle_layout = new QVBoxLayout(angle_frame);
+
+    auto angle_label = new QLabel("TARGET ANGLE (°)");
+    angle_label->setAlignment(Qt::AlignCenter);
+    angle_label->setStyleSheet("font-size: 14pt; font-weight: bold; color: " + ACCENT_COLOR + ";");
+
+    auto angle_control_layout = new QHBoxLayout();
     angle_slider_ = new QSlider(Qt::Horizontal);
     angle_slider_->setRange(-90, 90);
     angle_slider_->setValue(0);
@@ -193,57 +274,63 @@ void MainWindow::setupControlPanel()
     angle_spinbox_->setRange(-90.0, 90.0);
     angle_spinbox_->setSuffix(" °");
     angle_spinbox_->setValue(0.0);
-    angle_layout->addWidget(angle_slider_);
-    angle_layout->addWidget(angle_spinbox_);
+    angle_spinbox_->setMinimumWidth(120);
 
-    // Force control
-    auto force_layout = new QHBoxLayout();
-    force_layout->addWidget(new QLabel("Force (N):"));
-    force_slider_ = new QSlider(Qt::Horizontal);
-    force_slider_->setRange(0, 450); // 0-45.0 N with 0.1 resolution
-    force_slider_->setValue(0);
-    force_spinbox_ = new QDoubleSpinBox();
-    force_spinbox_->setRange(0.0, 45.0);
-    force_spinbox_->setSuffix(" N");
-    force_spinbox_->setDecimals(1);
-    force_spinbox_->setValue(0.0);
-    force_layout->addWidget(force_slider_);
-    force_layout->addWidget(force_spinbox_);
+    angle_control_layout->addWidget(angle_slider_, 3);
+    angle_control_layout->addWidget(angle_spinbox_, 1);
+
+    angle_layout->addWidget(angle_label);
+    angle_layout->addLayout(angle_control_layout);
 
     // Velocity control
-    auto velocity_layout = new QHBoxLayout();
-    velocity_layout->addWidget(new QLabel("Velocity (rad/s):"));
+    auto velocity_frame = new QFrame();
+    velocity_frame->setFrameStyle(QFrame::StyledPanel);
+    auto velocity_layout = new QVBoxLayout(velocity_frame);
+
+    auto velocity_label = new QLabel("MOTOR VELOCITY (rad/s)");
+    velocity_label->setAlignment(Qt::AlignCenter);
+    velocity_label->setStyleSheet("font-size: 14pt; font-weight: bold; color: " + ACCENT_COLOR + ";");
+
+    auto velocity_control_layout = new QHBoxLayout();
     velocity_slider_ = new QSlider(Qt::Horizontal);
-    velocity_slider_->setRange(0, 785);
+    velocity_slider_->setRange(-785, 785);
     velocity_slider_->setValue(0);
     velocity_spinbox_ = new QDoubleSpinBox();
-    velocity_spinbox_->setRange(0.0, 785.0);
+    velocity_spinbox_->setRange(-785.0, 785.0);
     velocity_spinbox_->setSuffix(" rad/s");
     velocity_spinbox_->setValue(0.0);
-    velocity_layout->addWidget(velocity_slider_);
-    velocity_layout->addWidget(velocity_spinbox_);
+    velocity_spinbox_->setMinimumWidth(120);
 
-    // Control buttons
+    velocity_control_layout->addWidget(velocity_slider_, 3);
+    velocity_control_layout->addWidget(velocity_spinbox_, 1);
+
+    velocity_layout->addWidget(velocity_label);
+    velocity_layout->addLayout(velocity_control_layout);
+
+    // Control buttons with enhanced styling
     auto button_layout = new QHBoxLayout();
-    stop_btn_ = new QPushButton("EMERGENCY STOP");
+    stop_btn_ = new QPushButton("🛑 EMERGENCY STOP");
     stop_btn_->setObjectName("stopButton");
-    stabilize_btn_ = new QPushButton("Stabilize");
-    refresh_btn_ = new QPushButton("Refresh");
+    stop_btn_->setMinimumHeight(50);
+
+    stabilize_btn_ = new QPushButton("⚖️ STABILIZE");
+    stabilize_btn_->setMinimumHeight(50);
+
+    refresh_btn_ = new QPushButton("🔄 REFRESH");
+    refresh_btn_->setMinimumHeight(50);
 
     button_layout->addWidget(stop_btn_);
     button_layout->addWidget(stabilize_btn_);
     button_layout->addWidget(refresh_btn_);
 
-    // Add to layout
-    layout->addLayout(angle_layout);
-    layout->addLayout(force_layout);
-    layout->addLayout(velocity_layout);
+    // Add to main layout
+    layout->addWidget(angle_frame);
+    layout->addWidget(velocity_frame);
     layout->addLayout(button_layout);
     layout->addStretch();
 
     // Connect signals
     connect(angle_slider_, &QSlider::valueChanged, this, &MainWindow::onAngleSliderChanged);
-    connect(force_slider_, &QSlider::valueChanged, this, &MainWindow::onForceSliderChanged);
     connect(velocity_slider_, &QSlider::valueChanged, this, &MainWindow::onVelocitySliderChanged);
     connect(stop_btn_, &QPushButton::clicked, this, &MainWindow::onStopClicked);
     connect(stabilize_btn_, &QPushButton::clicked, this, &MainWindow::onStabilizeClicked);
@@ -253,9 +340,6 @@ void MainWindow::setupControlPanel()
     connect(angle_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             [this](double value)
             { angle_slider_->setValue(static_cast<int>(value)); });
-    connect(force_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            [this](double value)
-            { force_slider_->setValue(static_cast<int>(value * 10)); });
     connect(velocity_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             [this](double value)
             { velocity_slider_->setValue(static_cast<int>(value)); });
@@ -263,96 +347,106 @@ void MainWindow::setupControlPanel()
 
 void MainWindow::setupMonitoringPanel()
 {
-    monitor_group_ = new QGroupBox("System Monitoring");
+    monitor_group_ = new QGroupBox("📡 TELEMETRY MONITOR");
     auto layout = new QVBoxLayout(monitor_group_);
+    layout->setSpacing(12);
 
-    // Create value labels
-    auto createValueRow = [this](const QString &label, QLabel *&value_label)
+    // Create enhanced value display function
+    auto createValueDisplay = [this](const QString &label, const QString &units, QLabel *&value_label)
     {
-        auto row = new QHBoxLayout();
-        auto label_widget = new QLabel(label + ":");
-        label_widget->setMinimumWidth(120);
-        value_label = new QLabel("0.00");
+        auto frame = new QFrame();
+        frame->setFrameStyle(QFrame::StyledPanel | QFrame::Raised);
+        frame->setStyleSheet(QString(R"(
+            QFrame {
+                background: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 %1, stop: 1 %2);
+                border: 1px solid %3;
+                border-radius: 8px;
+                padding: 5px;
+            }
+        )")
+                                 .arg(CARD_COLOR, BACKGROUND_COLOR, PRIMARY_COLOR));
+
+        auto frame_layout = new QVBoxLayout(frame);
+        frame_layout->setContentsMargins(10, 8, 10, 8);
+
+        auto label_widget = new QLabel(label);
+        label_widget->setAlignment(Qt::AlignCenter);
+        label_widget->setStyleSheet("font-size: 10pt; font-weight: bold; color: " + TEXT_COLOR + ";");
+
+        value_label = new QLabel("-- " + units);
         value_label->setObjectName("valueLabel");
         value_label->setAlignment(Qt::AlignCenter);
-        value_label->setMinimumWidth(100);
-        row->addWidget(label_widget);
-        row->addWidget(value_label);
-        row->addStretch();
-        return row;
+        value_label->setMinimumHeight(35);
+
+        frame_layout->addWidget(label_widget);
+        frame_layout->addWidget(value_label);
+
+        return frame;
     };
 
-    layout->addLayout(createValueRow("Arm Angle", arm_angle_value_));
-    layout->addLayout(createValueRow("Motor Speed", motor_speed_value_));
-    layout->addLayout(createValueRow("V EMF", v_emf_value_));
-    layout->addLayout(createValueRow("ΔV EMF", delta_v_emf_value_));
-    layout->addLayout(createValueRow("Error", error_value_));
-    layout->addLayout(createValueRow("Motor Cmd", motor_cmd_value_));
+    // Create monitoring displays
+    layout->addWidget(createValueDisplay("ARM ANGLE", "°", arm_angle_value_));
+    layout->addWidget(createValueDisplay("MOTOR SPEED", "rad/s", motor_speed_value_));
+    layout->addWidget(createValueDisplay("V EMF", "V", v_emf_value_));
+    layout->addWidget(createValueDisplay("ΔV EMF", "V", delta_v_emf_value_));
+    layout->addWidget(createValueDisplay("CONTROL ERROR", "°", error_value_));
+    layout->addWidget(createValueDisplay("MOTOR CMD", "rad/s", motor_cmd_value_));
 
-    // Progress bars
-    auto thrust_row = new QHBoxLayout();
-    thrust_row->addWidget(new QLabel("Thrust:"));
-    thrust_progress_ = new QProgressBar();
-    thrust_progress_->setRange(0, 450); // 0-45.0 N
-    thrust_progress_->setFormat("%v/45.0 N");
-    thrust_row->addWidget(thrust_progress_);
+    // Progress indicators
+    auto progress_frame = new QFrame();
+    progress_frame->setFrameStyle(QFrame::StyledPanel);
+    auto progress_layout = new QVBoxLayout(progress_frame);
 
-    auto angle_row = new QHBoxLayout();
-    angle_row->addWidget(new QLabel("Angle:"));
+    auto angle_progress_layout = new QHBoxLayout();
+    auto angle_progress_label = new QLabel("ANGLE POSITION:");
+    angle_progress_label->setMinimumWidth(120);
     angle_progress_ = new QProgressBar();
     angle_progress_->setRange(-90, 90);
     angle_progress_->setFormat("%v°");
-    angle_row->addWidget(angle_progress_);
+    angle_progress_->setMinimumHeight(25);
+    angle_progress_layout->addWidget(angle_progress_label);
+    angle_progress_layout->addWidget(angle_progress_);
 
-    layout->addLayout(thrust_row);
-    layout->addLayout(angle_row);
+    auto velocity_progress_layout = new QHBoxLayout();
+    auto velocity_progress_label = new QLabel("MOTOR VELOCITY:");
+    velocity_progress_label->setMinimumWidth(120);
+    velocity_progress_ = new QProgressBar();
+    velocity_progress_->setRange(0, 785);
+    velocity_progress_->setFormat("%v rad/s");
+    velocity_progress_->setMinimumHeight(25);
+    velocity_progress_layout->addWidget(velocity_progress_label);
+    velocity_progress_layout->addWidget(velocity_progress_);
+
+    progress_layout->addLayout(angle_progress_layout);
+    progress_layout->addLayout(velocity_progress_layout);
+
+    layout->addWidget(progress_frame);
     layout->addStretch();
-}
-
-void MainWindow::setupPlotsPanel()
-{
-    plots_group_ = new QGroupBox("Real-Time Data Plots");
-    auto layout = new QHBoxLayout(plots_group_);
-
-    // Create plots
-    angle_plot_ = new RealTimePlot("Arm Angle", "Angle", "degrees");
-    angle_plot_->setLineColor(QColor(ACCENT_COLOR));
-    angle_plot_->setYRange(-90, 90);
-    angle_plot_->setTimeWindow(30); // 30 seconds
-
-    error_plot_ = new RealTimePlot("Control Error", "Error", "degrees");
-    error_plot_->setLineColor(QColor(WARNING_COLOR));
-    error_plot_->setAutoScale(true);
-    error_plot_->setTimeWindow(30);
-
-    motor_plot_ = new RealTimePlot("Motor Command", "Speed", "rad/s");
-    motor_plot_->setLineColor(QColor(SUCCESS_COLOR));
-    motor_plot_->setYRange(0, 785);
-    motor_plot_->setTimeWindow(30);
-
-    layout->addWidget(angle_plot_);
-    layout->addWidget(error_plot_);
-    layout->addWidget(motor_plot_);
 }
 
 void MainWindow::createStatusBar()
 {
     auto status_bar = statusBar();
+    status_bar->setMinimumHeight(35);
 
-    connection_status_ = new QLabel("DISCONNECTED");
-    connection_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(DANGER_COLOR));
+    // Enhanced status indicators
+    auto createStatusLabel = [](const QString &text, const QString &color)
+    {
+        auto label = new QLabel(text);
+        label->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(255,255,255,0.1); border-radius: 4px;").arg(color));
+        return label;
+    };
 
-    control_mode_ = new QLabel("Manual");
-    control_mode_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(ACCENT_COLOR));
+    connection_status_ = createStatusLabel("DISCONNECTED", DANGER_COLOR);
+    control_mode_ = createStatusLabel("Manual", ACCENT_COLOR);
+    system_status_ = createStatusLabel("Ready", SUCCESS_COLOR);
 
-    system_status_ = new QLabel("Ready");
-    system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
-
-    status_bar->addWidget(new QLabel("Connection:"));
+    status_bar->addWidget(new QLabel("🔗 Connection:"));
     status_bar->addWidget(connection_status_);
-    status_bar->addPermanentWidget(new QLabel("Mode:"));
+    status_bar->addPermanentWidget(new QLabel("🎮 Mode:"));
     status_bar->addPermanentWidget(control_mode_);
-    status_bar->addPermanentWidget(new QLabel("Status:"));
+    status_bar->addPermanentWidget(new QLabel("⚡ Status:"));
     status_bar->addPermanentWidget(system_status_);
 }
 
@@ -365,7 +459,7 @@ void MainWindow::updateDisplays()
     if (!data.valid)
         return;
 
-    // Update value labels
+    // Update value labels with enhanced formatting
     arm_angle_value_->setText(QString::number(data.arm_angle_deg, 'f', 2) + "°");
     motor_speed_value_->setText(QString::number(data.motor_speed_est, 'f', 1) + " rad/s");
     v_emf_value_->setText(QString::number(data.v_emf, 'f', 3) + " V");
@@ -374,84 +468,83 @@ void MainWindow::updateDisplays()
     motor_cmd_value_->setText(QString::number(data.motor_command, 'f', 1) + " rad/s");
 
     // Update progress bars
-    thrust_progress_->setValue(static_cast<int>(data.motor_command * 0.57)); // Approximate thrust conversion
     angle_progress_->setValue(static_cast<int>(data.arm_angle_deg));
+    velocity_progress_->setValue(static_cast<int>(std::abs(data.motor_speed_est)));
 
-    // Update dashboard
-    dashboard_->setArmAngle(data.arm_angle_deg);
-    dashboard_->setTargetAngle(data.target_angle);
-    dashboard_->setMotorSpeed(data.motor_speed_est);
-    dashboard_->setThrust(data.motor_command * 0.057); // Approximate
-    dashboard_->setError(data.error);
-    dashboard_->setVEmf(data.v_emf);
-    dashboard_->setConnectionStatus(ros_node_->isConnected());
-    dashboard_->setSystemStatus(QString::fromStdString(ros_node_->getControlMode()));
-
-    // Update plots
-    double time_sec = data.timestamp.seconds() + data.timestamp.nanoseconds() * 1e-9;
-    angle_plot_->addDataPoint(data.arm_angle_deg, time_sec);
-    error_plot_->addDataPoint(data.error, time_sec);
-    motor_plot_->addDataPoint(data.motor_command, time_sec);
+    // Update data visualizer (main focus)
+    if (data_visualizer_)
+    {
+        data_visualizer_->onDataReceived(
+            data.arm_angle_deg,
+            data.motor_speed_est,
+            data.v_emf,
+            data.delta_v_emf,
+            data.error,
+            data.target_angle,
+            data.motor_command);
+    }
 
     // Update status
     control_mode_->setText(QString::fromStdString(ros_node_->getControlMode()));
-    system_status_->setText(data.valid ? "Active" : "Inactive");
+    system_status_->setText(data.valid ? "ACTIVE" : "INACTIVE");
+
+    // Color coding for status
+    QString status_color = data.valid ? SUCCESS_COLOR : WARNING_COLOR;
+    system_status_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(255,255,255,0.1); border-radius: 4px;").arg(status_color));
 }
 
 void MainWindow::onAngleSliderChanged(int value)
 {
     angle_spinbox_->setValue(value);
     ros_node_->sendAngleCommand(value);
-    control_mode_->setText("Angle Control");
-}
-
-void MainWindow::onForceSliderChanged(int value)
-{
-    double force = value / 10.0; // Convert back to actual force
-    force_spinbox_->setValue(force);
-    ros_node_->sendForceCommand(force);
-    control_mode_->setText("Force Control");
+    control_mode_->setText("ANGLE CONTROL");
 }
 
 void MainWindow::onVelocitySliderChanged(int value)
 {
     velocity_spinbox_->setValue(value);
     ros_node_->sendVelocityCommand(value);
-    control_mode_->setText("Velocity Control");
+    control_mode_->setText("VELOCITY CONTROL");
 }
 
 void MainWindow::onStopClicked()
 {
     ros_node_->sendStopCommand();
 
-    // Reset all controls
+    // Reset all controls with animation effect
     angle_slider_->setValue(0);
-    force_slider_->setValue(0);
     velocity_slider_->setValue(0);
     angle_spinbox_->setValue(0);
-    force_spinbox_->setValue(0);
     velocity_spinbox_->setValue(0);
 
-    control_mode_->setText("STOPPED");
-    system_status_->setText("Emergency Stop");
-    system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(DANGER_COLOR));
+    control_mode_->setText("🛑 EMERGENCY STOP");
+    control_mode_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(255,0,0,0.2); border-radius: 4px;").arg(DANGER_COLOR));
+
+    system_status_->setText("EMERGENCY STOP ACTIVE");
+    system_status_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(255,0,0,0.2); border-radius: 4px;").arg(DANGER_COLOR));
 }
 
 void MainWindow::onStabilizeClicked()
 {
-    ros_node_->sendAngleCommand(0.0); // Stabilize at horizontal
+    ros_node_->sendAngleCommand(0.0);
     angle_slider_->setValue(0);
     angle_spinbox_->setValue(0);
-    control_mode_->setText("Stabilizing");
+    control_mode_->setText("⚖️ STABILIZING");
+    control_mode_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(0,255,200,0.2); border-radius: 4px;").arg(ACCENT_COLOR));
 }
 
 void MainWindow::onRefreshClicked()
 {
-    // Clear plots and reset displays
-    angle_plot_->clearData();
-    error_plot_->clearData();
-    motor_plot_->clearData();
+    // Clear all visualizations
+    if (data_visualizer_)
+    {
+        data_visualizer_->clearData();
+    }
 
-    system_status_->setText("Ready");
-    system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
+    // Reset status
+    system_status_->setText("READY");
+    system_status_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(255,255,255,0.1); border-radius: 4px;").arg(SUCCESS_COLOR));
+
+    control_mode_->setText("MANUAL");
+    control_mode_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 12pt; padding: 5px 10px; background-color: rgba(255,255,255,0.1); border-radius: 4px;").arg(ACCENT_COLOR));
 }

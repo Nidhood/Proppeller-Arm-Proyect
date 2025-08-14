@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# ---------------------------- PYTHON IMPORTS ----------------------------
+# -------------------------- LAUNCH DEPENDENCIES -------------------------
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -10,7 +10,7 @@ from launch_ros.substitutions import FindPackageShare
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
 
-# ---------------------- LAUNCH DESCRIPTION ----------------------
+# ----------------------------- LAUNCH SCRIPT ----------------------------
 def generate_launch_description():
     
     # Launch arguments
@@ -95,15 +95,15 @@ def generate_launch_description():
         ),
 
         # 6. Launch PropArm GUI with fixed delay:
-        # TimerAction(
-        #     period=8.0, 
-        #     actions=[ IncludeLaunchDescription(
-        #         PythonLaunchDescriptionSource(gui_launch),
-        #         launch_arguments={
-        #             'use_sim_time': use_sim_time,
-        #             'log_level': 'info'
-        #         }.items()
-        #     ) ],
-        #     condition=IfCondition(launch_gui)
-        # ),
+        TimerAction(
+            period=8.0, 
+            actions=[ IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(gui_launch),
+                launch_arguments={
+                    'use_sim_time': use_sim_time,
+                    'log_level': 'info'
+                }.items()
+            ) ],
+            condition=IfCondition(launch_gui)
+        ),
     ])
