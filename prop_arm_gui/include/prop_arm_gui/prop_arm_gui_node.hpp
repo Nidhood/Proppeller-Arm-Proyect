@@ -8,6 +8,7 @@
 #include <memory>
 #include <deque>
 #include <mutex>
+#include <limits>
 
 struct PropArmData
 {
@@ -90,4 +91,9 @@ private:
     double min_angle_deg_ = -90.0;
     double max_force_n_ = 45.0;
     double max_velocity_rad_s_ = 785.0;
+    // Debounce/hysteresis for velocity publishing
+    double last_velocity_cmd_ = std::numeric_limits<double>::quiet_NaN();
+    rclcpp::Time last_velocity_pub_time_;
+    static constexpr double VELOCITY_CMD_MIN_DELTA = 0.5;   // rad/s threshold
+    static constexpr double VELOCITY_CMD_DEBOUNCE_S = 0.08; // min period between publishes
 };

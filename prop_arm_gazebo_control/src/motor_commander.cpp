@@ -22,7 +22,7 @@ namespace prop_arm_control
         // Wait for connections
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        RCLCPP_INFO(this->get_logger(), "Motor Commander initialized with corrected physics model");
+        RCLCPP_INFO(this->get_logger(), "Motor Commander initialized with equilibrium physics model");
     }
 
     double MotorCommander::mitToGazeboAngle(double mit_angle_degrees) const
@@ -57,6 +57,40 @@ namespace prop_arm_control
         trajectory_pub_->publish(trajectory_msg);
     }
 
+    double MotorCommander::calculateEquilibriumMotorSpeed() const
+    {
+        // === PARÁMETROS DEL SISTEMA (ajustar según tu configuración real) ===
+
+        // Geometría del brazo
+        const double M_m = 0.1;  // Masa en la punta del brazo [kg] (estimar)
+        const double M_a = 0.05; // Masa del brazo [kg] (estimar)
+        const double g = 9.81;   // Gravedad [m/s²]
+
+        // Constantes del plugin MulticopterMotorModel
+        const double motor_constant = 0.005; // motorConstant del plugin [N/(rad/s)²]
+
+        // === CÁLCULO SEGÚN LA FÓRMULA DEL DOCUMENTO ===
+
+        // Paso 1: Empuje de equilibrio para brazo horizontal (θ = 0°)
+        // F_T* = g(M_m + M_a/2)
+        const double F_T_star = g * (M_m + M_a / 2.0);
+
+        // Paso 2: Velocidad de equilibrio del motor
+        // ω₀ = √(F_T* / K_t0)
+        // Donde K_t0 = motorConstant del plugin
+        const double omega_0 = std::sqrt(F_T_star / motor_constant);
+
+        // Limitar a la velocidad máxima del plugin
+        const double max_motor_speed = 785.0; // maxRotVelocity del plugin
+        const double omega_equilibrium = std::min(omega_0, max_motor_speed);
+
+        RCLCPP_INFO(this->get_logger(),
+                    "Equilibrium calculation: F_T*=%.4f N, ω₀=%.2f rad/s (limited to %.2f)",
+                    F_T_star, omega_0, omega_equilibrium);
+
+        return omega_equilibrium;
+    }
+
     void MotorCommander::command_angle(double angle_degrees)
     {
         RCLCPP_INFO(this->get_logger(), "=== ANGLE CONTROL COMMAND ===");
@@ -74,62 +108,65 @@ namespace prop_arm_control
 
         RCLCPP_INFO(this->get_logger(), "Calculated thrust: %.2f N", thrust_force);
 
-        // Send through effort controller with proper force magnitude
-        auto effort_msg = std_msgs::msg::Float64MultiArray();
-        effort_msg.data.push_back(thrust_force);
-        effort_pub_->publish(effort_msg);
-
-        // Also send direct motor command as backup
-        if (thrust_force > 0.1)
+        // Convert thrust to motor speed using plugin's motor constant
+        double motor_speed = 0.0;
+        if (thrust_force > 0.001)
         {
-            double motor_speed = std::sqrt(thrust_force / 0.008); // F = k * ω²
-            motor_speed = std::min(motor_speed, 785.0);
-
-            gz::msgs::Actuators motor_msg;
-            motor_msg.add_velocity(motor_speed);
-            gz_node_->Request("/prop_arm/command/motor_speed", motor_msg);
-
-            RCLCPP_INFO(this->get_logger(), "Motor speed: %.1f rad/s", motor_speed);
+            const double motor_constant = 0.005; // From plugin config
+            motor_speed = std::sqrt(thrust_force / motor_constant);
+            motor_speed = std::min(motor_speed, 785.0); // Max speed from plugin
         }
 
-        last_command_type_ = LastCommandType::EFFORT;
+        // Send motor command
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(motor_speed);
+        gz_node_->Request("/prop_arm/command/motor_speed", motor_msg);
+
+        // Also send through velocity controller
+        auto velocity_msg = std_msgs::msg::Float64MultiArray();
+        velocity_msg.data.push_back(motor_speed);
+        velocity_pub_->publish(velocity_msg);
+
+        RCLCPP_INFO(this->get_logger(), "Motor speed: %.1f rad/s", motor_speed);
+
+        last_command_type_ = LastCommandType::VELOCITY;
         RCLCPP_INFO(this->get_logger(), "Command sent successfully!");
     }
 
     double MotorCommander::calculateThrustForAngle(double target_angle_degrees)
     {
-        double target_rad = mitToGazeboAngle(target_angle_degrees);
+        // Parámetros físicos del sistema
+        const double L_a = 0.15; // Longitud del brazo [m]
+        const double M_m = 0.1;  // Masa en la punta [kg]
+        const double M_a = 0.05; // Masa del brazo [kg]
+        const double g = 9.81;   // Gravedad [m/s²]
 
-        // Base parameters (adjust based on your arm's physical properties)
-        double arm_mass = 1.0;   // kg (estimate)
-        double arm_length = 0.5; // m (estimate)
-        double gravity = 9.81;   // m/s²
+        const double target_rad = target_angle_degrees * M_PI / 180.0;
 
-        // Gravitational torque at current angle: τ_gravity = m*g*L*sin(θ)
-        double gravitational_torque = arm_mass * gravity * arm_length * std::sin(target_rad);
+        // Empuje base de equilibrio (horizontal)
+        const double F_T_equilibrium = g * (M_m + M_a / 2.0);
 
-        // Convert torque to thrust force (assuming thrust acts at arm length)
-        double required_thrust = gravitational_torque / arm_length;
+        // Para ángulos diferentes de horizontal, ajustar según componente gravitacional
+        // Para θ > 0 (hacia arriba): necesita más empuje
+        // Para θ < 0 (hacia abajo): necesita menos empuje
 
-        // Add control margin for stability
-        double control_margin = 2.0; // N
-
-        if (target_angle_degrees >= 0.0)
+        double thrust_adjustment = 0.0;
+        if (std::abs(target_angle_degrees) > 1.0) // Solo ajustar si no es ~horizontal
         {
-
-            // Upward angles: need thrust to overcome gravity + margin
-            required_thrust = std::abs(required_thrust) + control_margin;
-        }
-        else
-        {
-
-            // Downward angles: reduce thrust, let gravity help
-            // Use minimal thrust for control, not to fight gravity
-            required_thrust = std::max(0.0, control_margin - std::abs(required_thrust));
+            // Torque gravitacional adicional por el ángulo
+            const double additional_torque = (M_m * g * L_a + M_a * g * L_a / 2.0) *
+                                             (std::sin(target_rad) - std::sin(0.0));
+            thrust_adjustment = additional_torque / L_a;
         }
 
-        // Apply realistic limits
-        required_thrust = std::max(0.0, std::min(50.0, required_thrust));
+        double required_thrust = F_T_equilibrium + thrust_adjustment;
+
+        // Asegurar que el empuje sea positivo (las hélices no pueden "tirar")
+        required_thrust = std::max(0.0, required_thrust);
+
+        // Limitar a valores razonables
+        const double max_thrust = 50.0; // [N]
+        required_thrust = std::min(required_thrust, max_thrust);
 
         return required_thrust;
     }
@@ -145,24 +182,28 @@ namespace prop_arm_control
         // Ensure positive force only (realistic propeller constraint)
         force_newtons = std::max(0.0, std::min(45.0, force_newtons));
 
-        auto effort_msg = std_msgs::msg::Float64MultiArray();
-        effort_msg.data.push_back(force_newtons);
-        effort_pub_->publish(effort_msg);
-
-        // Direct motor command
-        if (force_newtons > 0.1)
+        // Convert force to motor speed using plugin's motor constant
+        double motor_speed = 0.0;
+        if (force_newtons > 0.001)
         {
-            double motor_speed = std::sqrt(force_newtons / 0.008);
+            const double motor_constant = 0.005; // From plugin config
+            motor_speed = std::sqrt(force_newtons / motor_constant);
             motor_speed = std::min(motor_speed, 785.0);
-
-            gz::msgs::Actuators motor_msg;
-            motor_msg.add_velocity(motor_speed);
-            gz_node_->Request("/prop_arm/command/motor_speed", motor_msg);
-
-            RCLCPP_INFO(this->get_logger(), "Motor speed: %.1f rad/s", motor_speed);
         }
 
-        last_command_type_ = LastCommandType::EFFORT;
+        // Send motor command
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(motor_speed);
+        gz_node_->Request("/prop_arm/command/motor_speed", motor_msg);
+
+        // Also send through velocity controller
+        auto velocity_msg = std_msgs::msg::Float64MultiArray();
+        velocity_msg.data.push_back(motor_speed);
+        velocity_pub_->publish(velocity_msg);
+
+        RCLCPP_INFO(this->get_logger(), "Motor speed: %.1f rad/s", motor_speed);
+
+        last_command_type_ = LastCommandType::VELOCITY;
         RCLCPP_INFO(this->get_logger(), "Force command sent: %.1f N", force_newtons);
     }
 
@@ -211,32 +252,59 @@ namespace prop_arm_control
     void MotorCommander::print_current_controllers()
     {
         RCLCPP_INFO(this->get_logger(), "=== MIT PropArm Controller Status ===");
-        RCLCPP_INFO(this->get_logger(), "PHYSICS: Corrected gravity compensation model");
-        RCLCPP_INFO(this->get_logger(), "MOTOR: F = k*ω² with k=0.008, max_speed=785 rad/s");
-        RCLCPP_INFO(this->get_logger(), "Primary control: Force/effort controller");
+        RCLCPP_INFO(this->get_logger(), "PHYSICS: Equilibrium gravity compensation model");
+        RCLCPP_INFO(this->get_logger(), "PLUGIN: MulticopterMotorModel with motorConstant=0.005");
+        RCLCPP_INFO(this->get_logger(), "MOTOR: F = k*ω² with k=0.005, max_speed=785 rad/s");
         RCLCPP_INFO(this->get_logger(), "MIT Reference: 0° = horizontal, +90° = up, -90° = down");
-        RCLCPP_INFO(this->get_logger(), "Thrust range: 0-45N (positive only)");
+
+        // Calcular y mostrar velocidad de equilibrio
+        double eq_speed = calculateEquilibriumMotorSpeed();
+        RCLCPP_INFO(this->get_logger(), "Equilibrium motor speed: %.2f rad/s", eq_speed);
     }
 
     void MotorCommander::stabilize_at_horizontal()
     {
-        RCLCPP_INFO(this->get_logger(), "Stabilizing at horizontal position with gravity compensation...");
-        command_angle(0.0);
+        RCLCPP_INFO(this->get_logger(), "=== EQUILIBRIUM STABILIZATION ===");
+
+        // Calcular velocidad de motor de equilibrio usando la fórmula exacta
+        double equilibrium_speed = calculateEquilibriumMotorSpeed();
+
+        RCLCPP_INFO(this->get_logger(), "Stabilizing with equilibrium motor speed: %.2f rad/s",
+                    equilibrium_speed);
+
+        // Parar todos los comandos primero
+        send_zero_commands();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+        // Enviar comando de velocidad de equilibrio
+        gz::msgs::Actuators motor_msg;
+        motor_msg.add_velocity(equilibrium_speed);
+        gz_node_->Request("/prop_arm/command/motor_speed", motor_msg);
+
+        // También enviar a través del controlador de velocidad
+        auto velocity_msg = std_msgs::msg::Float64MultiArray();
+        velocity_msg.data.push_back(equilibrium_speed);
+        velocity_pub_->publish(velocity_msg);
+
+        last_command_type_ = LastCommandType::VELOCITY;
+
+        RCLCPP_INFO(this->get_logger(), "Equilibrium stabilization command sent!");
+        RCLCPP_INFO(this->get_logger(), "Expected result: arm should hover horizontally");
     }
 
     void print_usage()
     {
-        std::cout << "\n=== MIT PropArm Motor Commander (Corrected Physics) ===\n";
+        std::cout << "\n=== MIT PropArm Motor Commander (Equilibrium Physics) ===\n";
         std::cout << "Usage: motor_commander_node <command> [value]\n\n";
         std::cout << "Commands:\n";
-        std::cout << "  angle <degrees>     - Control arm angle (-90 to +90) with gravity compensation\n";
+        std::cout << "  angle <degrees>     - Control arm angle (-90 to +90) with physics model\n";
         std::cout << "  force <newtons>     - Direct thrust control (0 to 45N)\n";
         std::cout << "  velocity <rad/s>    - Direct motor speed (0 to 785 rad/s)\n";
-        std::cout << "  test                - Run corrected physics test sequence\n";
-        std::cout << "  stabilize           - Stabilize at horizontal with gravity compensation\n";
+        std::cout << "  test                - Run equilibrium physics test sequence\n";
+        std::cout << "  stabilize           - Apply equilibrium motor speed (ω₀ = √(F_T*/k))\n";
         std::cout << "  stop                - Emergency stop\n\n";
-        std::cout << "Physics: Corrected gravity model F = mg(L/2)sin(θ)/d + margins\n";
-        std::cout << "Motor: F = k*ω² with k=0.008, realistic thrust limits\n";
+        std::cout << "Physics: F_T* = g(M_m + M_a/2), ω₀ = √(F_T*/motorConstant)\n";
+        std::cout << "Plugin: MulticopterMotorModel with motorConstant=0.005, maxSpeed=785\n";
     }
 
 } // namespace prop_arm_control
@@ -262,6 +330,10 @@ int main(int argc, char *argv[])
     else if (command == "stop")
     {
         commander->stop_all_commands();
+    }
+    else if (command == "status")
+    {
+        commander->print_current_controllers();
     }
     else if (argc == 3)
     {

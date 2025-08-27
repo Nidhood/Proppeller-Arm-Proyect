@@ -61,7 +61,7 @@ def generate_launch_description():
             condition=UnlessCondition(LaunchConfiguration('gui_only'))
         ),
 
-        # GUI-only mode (for standalone testing)
+        # GUI-only mode
         Node(
             package='prop_arm_gui',
             executable='prop_arm_gui',
