@@ -168,7 +168,7 @@ std::vector<PropArmData> PropArmGuiNode::getHistoryData(size_t max_points) const
 void PropArmGuiNode::sendAngleCommand(double angle_degrees)
 {
     target_angle_deg_ = std::clamp(angle_degrees, min_angle_deg_, max_angle_deg_);
-    control_mode_ = "Angle Control";
+    control_mode_ = "ANGLE CONTROL";
 
     // Convert angle to velocity command (simple proportional control)
     double error = target_angle_deg_ - current_data_.arm_angle_deg;
@@ -199,8 +199,18 @@ void PropArmGuiNode::sendForceCommand(double force_newtons)
 void PropArmGuiNode::sendVelocityCommand(double velocity_rad_s)
 {
     velocity_rad_s = std::clamp(velocity_rad_s, -max_velocity_rad_s_, max_velocity_rad_s_);
-    control_mode_ = "Velocity Control";
+    control_mode_ = "VELOCITY CONTROL";
 
+    // Debounce/hysteresis: publish only if value changed enough and min time elapsed
+    const rclcpp::Time now_time = now();
+    const bool time_ok = (!last_velocity_pub_time_.nanoseconds()) || ((now_time - last_velocity_pub_time_).seconds() >= VELOCITY_CMD_DEBOUNCE_S);
+    const bool value_ok = (std::isnan(last_velocity_cmd_)) || (std::fabs(velocity_rad_s - last_velocity_cmd_) >= VELOCITY_CMD_MIN_DELTA);
+    if (!(time_ok && value_ok))
+    {
+        return;
+    }
+    last_velocity_cmd_ = velocity_rad_s;
+    last_velocity_pub_time_ = now_time;
     auto msg = std_msgs::msg::Float64MultiArray();
     msg.data = {velocity_rad_s};
     velocity_cmd_pub_->publish(msg);

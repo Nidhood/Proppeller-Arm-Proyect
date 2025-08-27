@@ -5,20 +5,20 @@
     <gazebo>
         <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
             <robotNamespace>prop_arm</robotNamespace>
-            <jointName>prop_link_joint</jointName>  
+            <jointName>prop_link_joint</jointName>
             <linkName>prop_link</linkName>
             <turningDirection>cw</turningDirection>
-            <timeConstantUp>0.01</timeConstantUp>            
+            <timeConstantUp>0.01</timeConstantUp>
             <timeConstantDown>0.005</timeConstantDown>
-            <maxRotVelocity>785.0</maxRotVelocity>           
-            <motorConstant>0.005</motorConstant>          
-            <momentConstant>0.02</momentConstant>            
+            <maxRotVelocity>785.0</maxRotVelocity>
+            <motorConstant>1.35e-05</motorConstant>
+            <momentConstant>0.01273</momentConstant>
             <commandSubTopic>command/motor_speed</commandSubTopic>
             <actuator_number>0</actuator_number>
-            <rotorDragCoefficient>0.0005</rotorDragCoefficient>          
-            <rollingMomentCoefficient>0.00001</rollingMomentCoefficient>
             <motorSpeedPubTopic>motor_speed/0</motorSpeedPubTopic>
-            <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>            
+            <rotorDragCoefficient>8.0e-05</rotorDragCoefficient>
+            <rollingMomentCoefficient>1.0e-06</rollingMomentCoefficient>
+            <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
             <motorType>velocity</motorType>
         </plugin>
     </gazebo>

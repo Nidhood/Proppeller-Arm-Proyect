@@ -61,6 +61,9 @@ namespace prop_arm_control
         // Physics calculation methods
         double calculateThrustForAngle(double target_angle_degrees);
 
+        // NEW: Equilibrium calculation method
+        double calculateEquilibriumMotorSpeed() const;
+
         // Internal utility methods
         void send_zero_commands();
     };

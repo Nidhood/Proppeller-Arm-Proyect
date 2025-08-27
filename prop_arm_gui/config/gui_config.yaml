@@ -9,56 +9,82 @@ prop_arm_gui_node:
     # Target parameters
     target_angle_deg: 0.0
 
-    # Update rates
-    gui_update_rate_hz: 20.0
-    plot_update_rate_hz: 10.0
-    ros_spin_rate_hz: 100.0
+    # Update rates - OPTIMIZED for performance
+    gui_update_rate_hz: 10.0 # Reduced from 20 to prevent UI slowdown
+    plot_update_rate_hz: 5.0 # Reduced from 10 to prevent controller interference
+    ros_spin_rate_hz: 100.0 # Keep high for ROS responsiveness
 
-    # Visualization settings (ACTUALLY USED NOW)
+    # Professional visualization settings - OPTIMIZED
     visualization:
-      time_window_sec: 60.0
-      max_plot_points: 2000
-      update_rate_ms: 50
-      smooth_transitions: true
+      time_window_sec: 30.0 # Reduced from 60 for better performance
+      max_plot_points: 500 # Reduced from 2500 for faster rendering
+      update_rate_ms: 100 # Increased from 40 to reduce CPU load
+      smooth_transitions: false # Disabled to prevent controller interference
       show_grid: true
+      grid_style: "minimal" # Changed from professional to reduce rendering
+      theme: "elegant_white" # Changed from monochrome_professional
 
-      # Chart specific settings
+      # Chart specific settings with elegant white/dark scheme
       charts:
         arm_angle:
           auto_scale: false
           y_min: -95.0
           y_max: 95.0
-          color: "#00ffcc" # NEON_CYAN
+          color: "#FFFFFF" # Pure white - elegant and clean
+          secondary_color: "#C8C8C8" # Light gray
+          grid_density: "normal"
+          show_trend: false # DISABLED - was causing controller interference
+          show_milliseconds: false # FIXED - always show seconds
 
         control_error:
           auto_scale: true
           y_min: -10.0
           y_max: 10.0
-          color: "#ff5050" # NEON_RED
+          color: "#FFB6C1" # Light pink
+          secondary_color: "#FFC8CB"
+          grid_density: "normal"
+          show_trend: false # DISABLED
+          show_milliseconds: false
 
         motor_speed:
           auto_scale: false
           y_min: 0.0
           y_max: 850.0
-          color: "#32ff64" # NEON_GREEN
+          color: "#98FB98" # Pale green
+          secondary_color: "#AAFFAA"
+          grid_density: "normal"
+          show_trend: false # DISABLED
+          show_milliseconds: false
 
         motor_command:
           auto_scale: false
           y_min: -850.0
           y_max: 850.0
-          color: "#b464ff" # NEON_PURPLE
+          color: "#ADD8E6" # Light blue
+          secondary_color: "#B8E6FF"
+          grid_density: "normal"
+          show_trend: false # DISABLED - critical for control stability
+          show_milliseconds: false
 
         v_emf:
           auto_scale: true
           y_min: -25.0
           y_max: 25.0
-          color: "#ff9600" # NEON_ORANGE
+          color: "#DDA0DD" # Plum
+          secondary_color: "#E6B8E6"
+          grid_density: "fine"
+          show_trend: false # DISABLED
+          show_milliseconds: false
 
         delta_v_emf:
           auto_scale: true
           y_min: -8.0
           y_max: 8.0
-          color: "#0096ff" # NEON_BLUE
+          color: "#FFD700" # Gold
+          secondary_color: "#FFED4E"
+          grid_density: "fine"
+          show_trend: false # DISABLED
+          show_milliseconds: false
 
     # Connection settings
     connection_timeout_sec: 2.0
@@ -72,8 +98,8 @@ prop_arm_gui_node:
       velocity_cmd: "/velocity_controller/commands"
       force_cmd: "/motor_force_controller/commands"
 
-    # GUI appearance
-    theme: "aerospace_dark"
+    # GUI appearance - Clean elegant theme
+    theme: "elegant_white"
     window:
       width: 1920
       height: 1200
@@ -81,15 +107,44 @@ prop_arm_gui_node:
       min_height: 1000
       fullscreen: false
 
-    # Aerospace color scheme
+    # Elegant white/dark color scheme - OPTIMIZED
     colors:
-      background_dark: "#080a0f"
-      grid_color: "#19232d"
-      text_color: "#dce6f0"
-      neon_blue: "#0096ff"
-      neon_cyan: "#00ffcc"
-      neon_green: "#32ff64"
-      neon_orange: "#ff9600"
-      neon_purple: "#b464ff"
-      neon_red: "#ff5050"
-      accent_glow: "#00c8ff"
+      # Base colors
+      background_dark: "#000000" # Pure black
+      plot_background: "#0F0F0F" # Very dark grey
+      text_primary: "#FFFFFF" # Pure white
+      text_secondary: "#C8C8C8" # Light gray
+
+      # Grid system - more subtle
+      grid_primary: "#282828" # Subtle grid lines
+      grid_secondary: "#1A1A1A" # Very subtle secondary grid
+
+      # Clean elegant colors
+      accent_white: "#FFFFFF" # Pure white - main accent
+      accent_light_gray: "#C8C8C8" # Light gray
+      accent_green: "#98FB98" # Pale green
+      accent_blue: "#ADD8E6" # Light blue
+      accent_purple: "#DDA0DD" # Plum
+      accent_pink: "#FFB6C1" # Light pink
+      accent_gold: "#FFD700" # Gold
+
+      # Legacy support (mapped to clean colors)
+      neon_blue: "#ADD8E6"
+      neon_cyan: "#E0FFFF"
+      neon_green: "#98FB98"
+      neon_orange: "#FFDAB9"
+      neon_purple: "#DDA0DD"
+      neon_red: "#FFB6C1"
+      accent_glow: "#FFFFFF"
+
+    # Typography settings - optimized
+    typography:
+      title_font: "Arial" # Standard font for compatibility
+      mono_font: "Consolas" # Monospace for data
+      body_font: "Arial" # Standard font
+
+      sizes:
+        title: 11 # Reduced font sizes for performance
+        axis_title: 9
+        axis_labels: 8
+        legend: 8

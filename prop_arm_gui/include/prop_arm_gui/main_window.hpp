@@ -16,7 +16,12 @@
 #include <QFrame>
 #include <QFont>
 #include <QPalette>
+#include <QScreen>
+#include <QGuiApplication>
+#include <QMetaObject>
+#include <QThread>
 #include <memory>
+#include <future>
 
 #include "prop_arm_gui/prop_arm_gui_node.hpp"
 
@@ -28,6 +33,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
+    void applyConfigToControls();
+
     explicit MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent = nullptr);
     ~MainWindow() = default;
 
@@ -42,6 +49,7 @@ private slots:
 private:
     void setupUI();
     void setupStyles();
+    void setupUbuntuScreenGeometry(); // Updated method for Qt6 screen handling
     void setupControlTab();
     void setupControlPanel();
     void setupMonitoringPanel();
