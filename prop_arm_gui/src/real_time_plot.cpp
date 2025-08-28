@@ -16,7 +16,7 @@ const QColor RealTimePlot::PLOT_BACKGROUND = QColor(30, 41, 59);  // Darker slat
 RealTimePlot::RealTimePlot(const QString &title, const QString &y_label,
                            const QString &units, QWidget *parent)
     : QWidget(parent),
-      title_(title), y_label_(y_label), units_(units), // Fixed order
+      title_(title), y_label_(y_label), units_(units),
       max_points_(1000), time_window_sec_(30.0),
       line_color_(QColor(59, 130, 246)), line_width_(2),
       auto_scale_(true), y_min_(0.0), y_max_(100.0),
@@ -50,7 +50,7 @@ void RealTimePlot::setupChart()
 {
     chart_ = new QChart();
     chart_->setTitle(title_);
-    chart_->setAnimationOptions(QChart::NoAnimation); // Disable for real-time performance
+    chart_->setAnimationOptions(QChart::NoAnimation);
 
     // Create series
     series_ = new QLineSeries();

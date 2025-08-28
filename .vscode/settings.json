@@ -64,12 +64,13 @@
     "stop_token": "cpp",
     "thread": "cpp",
     "variant": "cpp",
-    "qgraphicslineitem": "cpp"
+    "qgraphicslineitem": "cpp",
+    "complex": "cpp"
   },
   "ros.distro": "jazzy",
   "python.autoComplete.extraPaths": [
     "/opt/ros/jazzy/lib/python3.12/site-packages"
   ],
   "python.analysis.extraPaths": ["/opt/ros/jazzy/lib/python3.12/site-packages"],
-  "cmake.sourceDirectory": "/home/nidhood/prop_arm_ws/src/prop_arm_gazebo_control"
+  "cmake.sourceDirectory": "/home/rasjave1/prop_arm_ws/src/prop_arm_gui"
 }
