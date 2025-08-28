@@ -12,14 +12,10 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
     : QMainWindow(parent), ros_node_(node)
 {
     setWindowTitle("PropArm Control System - Aerospace Data Visualization");
-
-    // FIXED: Updated screen geometry setup for Qt6
     setupUbuntuScreenGeometry();
 
     setupStyles();
     setupUI();
-
-    // Connect ROS node signals with thread-safe connections
     connect(ros_node_.get(), &PropArmGuiNode::dataUpdated,
             this, &MainWindow::updateDisplays, Qt::QueuedConnection);
     connect(ros_node_.get(), &PropArmGuiNode::connectionChanged, this, [this](bool connected)
@@ -29,23 +25,17 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
                     connection_status_->setStyleSheet(connected ? 
                         QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR) :
                         QString("color: %1; font-weight: bold;").arg(DANGER_COLOR)); }, Qt::QueuedConnection); }, Qt::QueuedConnection);
-
-    // Setup update timer with reduced frequency to prevent UI freezing
     update_timer_ = new QTimer(this);
     connect(update_timer_, &QTimer::timeout, this, &MainWindow::updateDisplays);
     update_timer_->start(200);
-
-    // Initial update
     updateDisplays();
 }
 
 void MainWindow::setupUbuntuScreenGeometry()
 {
-    // Get the primary screen (Qt6 approach)
     QScreen *screen = QGuiApplication::primaryScreen();
     if (!screen)
     {
-        // Fallback to first available screen
         auto screens = QGuiApplication::screens();
         if (!screens.isEmpty())
         {
@@ -53,7 +43,6 @@ void MainWindow::setupUbuntuScreenGeometry()
         }
         else
         {
-            // Last resort fallback - use window defaults
             setMinimumSize(1400, 900);
             resize(1600, 1000);
             return;
@@ -64,10 +53,9 @@ void MainWindow::setupUbuntuScreenGeometry()
     QRect screenGeometry = screen->geometry();
     QRect availableGeometry = screen->availableGeometry();
 
-    // Fixed: Remove unused variables and calculate window size directly
     // Set window geometry with proper margins for Ubuntu
-    int windowWidth = availableGeometry.width() - 40;   // 20px margin on each side
-    int windowHeight = availableGeometry.height() - 40; // 20px margin top/bottom
+    int windowWidth = availableGeometry.width() - 40;
+    int windowHeight = availableGeometry.height() - 40;
 
     // Position window in available space
     int x = availableGeometry.x() + 20;
@@ -537,10 +525,10 @@ void MainWindow::setupControlPanel()
 
     auto angle_control_layout = new QHBoxLayout();
     angle_slider_ = new QSlider(Qt::Horizontal);
-    angle_slider_->setRange(-90, 90);
+    angle_slider_->setRange(0, 90);
     angle_slider_->setValue(0);
     angle_spinbox_ = new QDoubleSpinBox();
-    angle_spinbox_->setRange(-90.0, 90.0);
+    angle_spinbox_->setRange(0.0, 90.0);
     angle_spinbox_->setSuffix(" °");
     angle_spinbox_->setValue(0.0);
     angle_spinbox_->setMinimumWidth(120);
@@ -562,11 +550,11 @@ void MainWindow::setupControlPanel()
 
     auto velocity_control_layout = new QHBoxLayout();
     velocity_slider_ = new QSlider(Qt::Horizontal);
-    velocity_slider_->setRange(-785, 785);
+    velocity_slider_->setRange(0, 780);
     velocity_slider_->setValue(0);
     velocity_slider_->setTracking(false); // Publish only on release to avoid noise
     velocity_spinbox_ = new QDoubleSpinBox();
-    velocity_spinbox_->setRange(-785.0, 785.0);
+    velocity_spinbox_->setRange(0.0, 780.0);
     velocity_spinbox_->setSuffix(" rad/s");
     velocity_spinbox_->setValue(0.0);
     velocity_spinbox_->setMinimumWidth(120);
@@ -599,15 +587,12 @@ void MainWindow::setupControlPanel()
     layout->addLayout(button_layout);
     layout->addStretch();
 
-    // Connect signals with thread-safe connections
+    // Connections:
     connect(angle_slider_, &QSlider::valueChanged, this, &MainWindow::onAngleSliderChanged, Qt::QueuedConnection);
     connect(velocity_slider_, &QSlider::valueChanged, this, &MainWindow::onVelocitySliderChanged, Qt::QueuedConnection);
     connect(stop_btn_, &QPushButton::clicked, this, &MainWindow::onStopClicked, Qt::QueuedConnection);
     connect(stabilize_btn_, &QPushButton::clicked, this, &MainWindow::onStabilizeClicked, Qt::QueuedConnection);
     connect(refresh_btn_, &QPushButton::clicked, this, &MainWindow::onRefreshClicked, Qt::QueuedConnection);
-
-    // FIXED: Correct Qt6 syntax for spinbox connections with lambdas
-    // For Qt6, when using lambdas with connection type, we need to use the 5-parameter version
     connect(angle_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, [this](double value)
             { angle_slider_->setValue(static_cast<int>(value)); }, Qt::QueuedConnection);
 

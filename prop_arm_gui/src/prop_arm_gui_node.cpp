@@ -7,7 +7,7 @@ PropArmGuiNode::PropArmGuiNode(const rclcpp::NodeOptions &options)
 {
     // Declare parameters with default values
     this->declare_parameter<double>("max_angle_deg", 90.0);
-    this->declare_parameter<double>("min_angle_deg", -90.0);
+    this->declare_parameter<double>("min_angle_deg", 0.0);
     this->declare_parameter<double>("max_force_n", 45.0);
     this->declare_parameter<double>("max_velocity_rad_s", 785.0);
     this->declare_parameter<double>("target_angle_deg", 0.0);
@@ -172,7 +172,7 @@ void PropArmGuiNode::sendAngleCommand(double angle_degrees)
 
     // Convert angle to velocity command (simple proportional control)
     double error = target_angle_deg_ - current_data_.arm_angle_deg;
-    double velocity_cmd = error * 5.0; // Proportional gain
+    double velocity_cmd = error * 5.0;
     velocity_cmd = std::clamp(velocity_cmd, -max_velocity_rad_s_, max_velocity_rad_s_);
 
     auto msg = std_msgs::msg::Float64MultiArray();
@@ -187,11 +187,9 @@ void PropArmGuiNode::sendForceCommand(double force_newtons)
 {
     force_newtons = std::clamp(force_newtons, 0.0, max_force_n_);
     control_mode_ = "Force Control";
-
     auto msg = std_msgs::msg::Float64MultiArray();
     msg.data = {force_newtons};
     force_cmd_pub_->publish(msg);
-
     std::lock_guard<std::mutex> lock(data_mutex_);
     current_data_.motor_command = force_newtons;
 }
@@ -200,8 +198,6 @@ void PropArmGuiNode::sendVelocityCommand(double velocity_rad_s)
 {
     velocity_rad_s = std::clamp(velocity_rad_s, -max_velocity_rad_s_, max_velocity_rad_s_);
     control_mode_ = "VELOCITY CONTROL";
-
-    // Debounce/hysteresis: publish only if value changed enough and min time elapsed
     const rclcpp::Time now_time = now();
     const bool time_ok = (!last_velocity_pub_time_.nanoseconds()) || ((now_time - last_velocity_pub_time_).seconds() >= VELOCITY_CMD_DEBOUNCE_S);
     const bool value_ok = (std::isnan(last_velocity_cmd_)) || (std::fabs(velocity_rad_s - last_velocity_cmd_) >= VELOCITY_CMD_MIN_DELTA);
@@ -214,7 +210,6 @@ void PropArmGuiNode::sendVelocityCommand(double velocity_rad_s)
     auto msg = std_msgs::msg::Float64MultiArray();
     msg.data = {velocity_rad_s};
     velocity_cmd_pub_->publish(msg);
-
     std::lock_guard<std::mutex> lock(data_mutex_);
     current_data_.motor_command = velocity_rad_s;
 }
@@ -233,7 +228,7 @@ void PropArmGuiNode::sendStopCommand()
 
     std::lock_guard<std::mutex> lock(data_mutex_);
     current_data_.motor_command = 0.0;
-    target_angle_deg_ = current_data_.arm_angle_deg; // Hold current position
+    target_angle_deg_ = current_data_.arm_angle_deg;
 }
 
 bool PropArmGuiNode::isConnected() const

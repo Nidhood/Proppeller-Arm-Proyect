@@ -7,20 +7,20 @@
   <!-- Main robot link -->
   <link name="base_link">
     <collision name="base_collision">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/base.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/base.stl" scale="1 1 1"/>
       </geometry>
     </collision>
     <inertial>
-      <inertia ixx="4.49421" ixy="1.19011" ixz="-0.32403" iyy="1.83979" iyz="0.67570" izz="5.09395"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00341 -0.01201 -0.10842"/>
-      <mass value="10.00000"/>
+      <inertia ixx="4.49421" ixy="0" ixz="0" iyy="1.83979" iyz="0" izz="5.09395"/>
+      <origin rpy="0 0 0" xyz="-0.00341 -0.01201 -0.10842"/>
+      <mass value="10.0"/>
     </inertial>
     <visual name="base">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/base.dae" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/base.dae" scale="1 1 1"/>
       </geometry>
     </visual>
   </link>
@@ -28,20 +28,20 @@
   <!-- Arm link -->
   <link name="arm_link">
     <collision name="arm_collision">
-      <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 0.00000 -0.00000"/>
+      <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/arm.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/arm.stl" scale="1 1 1"/>
       </geometry>
     </collision>
     <inertial>
-      <inertia ixx="0.9156" ixy="-0.00006" ixz="-0.01066" iyy="0.91818" iyz="-0.00628" izz="0.01020"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.14437 -0.00020 0.01985"/>
-      <mass value="20.0"/>  
+      <inertia ixx="1.0e-05" ixy="0" ixz="0" iyy="2.7e-04" iyz="0" izz="2.7e-04"/>
+      <origin rpy="0 0 0" xyz="0.14437 -0.00020 0.01985"/>
+      <mass value="0.02"/>
     </inertial>
     <visual name="arm">
-      <origin rpy="0.00000 -1.57080 0.00000" xyz="0.00000 -0.00000 -0.00000"/>
+      <origin rpy="0 -1.5708 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/arm.dae" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/arm.dae" scale="1 1 1"/>
       </geometry>
     </visual>
   </link>
@@ -49,20 +49,20 @@
   <!-- Motor link -->
   <link name="motor_link">
     <collision name="motor_collision">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 -0.00000 0.00000"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/motor.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/motor.stl" scale="1 1 1"/>
       </geometry>
     </collision>
     <inertial>
-      <inertia ixx="0.00229" ixy="0.00020" ixz="-0.00002" iyy="0.00144" iyz="0.00012" izz="0.00226"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00013 0.00073 -0.00279"/>
-      <mass value="10.00000"/>
+      <inertia ixx="1.8825e-05" ixy="0" ixz="0" iyy="1.8825e-05" iyz="0" izz="1.5619e-05"/>
+      <origin rpy="0 0 0" xyz="-0.00013 0.00073 -0.00279"/>
+      <mass value="0.102"/>
     </inertial>
     <visual name="motor">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/motor.dae" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/motor.dae" scale="1 1 1"/>
       </geometry>
     </visual>
   </link>
@@ -70,20 +70,20 @@
   <!-- Propeller link-->
   <link name="prop_link">
     <collision name="prop_collision">
-      <origin rpy="-0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/prop.stl" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/collisions/prop.stl" scale="1 1 1"/>
       </geometry>
     </collision>
     <inertial>
-      <inertia ixx="0.00022" ixy="-0.00077" ixz="-0.00002" iyy="0.03639" iyz="0.00000" izz="0.03655"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00007 0.00056 0.00001"/>
-      <mass value="10.00000"/>
+      <inertia ixx="1.0e-06" ixy="0" ixz="0" iyy="1.0e-06" iyz="0" izz="1.0e-06"/>
+      <origin rpy="0 0 0" xyz="0.00007 0.00056 0.00001"/>
+      <mass value="0.005"/>
     </inertial>
     <visual name="prop">
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00000 -0.00000 0.00000"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/prop.dae" scale="1.00000 1.00000 1.00000"/>
+        <mesh filename="package://prop_arm_description/models/prop_arm/meshes/visuals/prop.dae" scale="1 1 1"/>
       </geometry>
     </visual>
   </link>

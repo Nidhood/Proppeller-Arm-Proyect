@@ -31,7 +31,6 @@ AerospaceDataVisualizer::AerospaceDataVisualizer(std::shared_ptr<rclcpp::Node> n
                     // Updates are handled directly in onDataReceived
                 } });
     update_timer_->start();
-
     setMinimumSize(1400, 900);
 
     // Enhanced styling with support for smooth curves
@@ -117,12 +116,9 @@ ChartBase::ChartConfig AerospaceDataVisualizer::createChartConfig(
     config.time_window_sec = time_window_sec_;
     config.max_points = max_points_;
     config.show_milliseconds = false;
+    config.use_smooth_curves = true;
+    config.show_minor_grid = true;
 
-    // NEW: Enhanced visual features
-    config.use_smooth_curves = true; // Enable smooth spline curves
-    config.show_minor_grid = true;   // Enable minor grid lines
-
-    // Load chart-specific configuration from ROS parameters
     if (ros_node_)
     {
         try
@@ -132,12 +128,9 @@ ChartBase::ChartConfig AerospaceDataVisualizer::createChartConfig(
             config.auto_scale = ros_node_->get_parameter_or(base_key + ".auto_scale", config.auto_scale);
             config.y_min = ros_node_->get_parameter_or(base_key + ".y_min", config.y_min);
             config.y_max = ros_node_->get_parameter_or(base_key + ".y_max", config.y_max);
-
-            // NEW: Load smooth curve settings
             config.use_smooth_curves = ros_node_->get_parameter_or(base_key + ".use_smooth_curves", config.use_smooth_curves);
             config.show_minor_grid = ros_node_->get_parameter_or(base_key + ".show_minor_grid", config.show_minor_grid);
 
-            // Load color configuration
             auto color_str = ros_node_->get_parameter_or(base_key + ".color", std::string(""));
             if (!color_str.empty())
             {
@@ -170,14 +163,14 @@ void AerospaceDataVisualizer::setupUI()
         {"ARM ANGLE vs TIME",
          "Angle", "degrees",
          QColor(100, 200, 255), QColor(150, 220, 255), // Bright blue - primary signal
-         -90, 90, false, "arm_angle",
+         0, 100, false, "arm_angle",
          [](const TelemetryData &data)
          { return data.arm_angle; }},
 
         {"CONTROL ERROR vs TIME",
          "Error", "degrees",
          QColor(255, 100, 100), QColor(255, 150, 150), // Bright red - error signal
-         -10, 10, true, "control_error",
+         -90, 90, false, "control_error",
          [](const TelemetryData &data)
          { return data.error; }},
 
@@ -191,21 +184,21 @@ void AerospaceDataVisualizer::setupUI()
         {"MOTOR COMMAND vs TIME",
          "Command", "rad/s",
          QColor(255, 200, 0), QColor(255, 220, 100), // Bright yellow/orange - command signal
-         -800, 800, false, "motor_command",
+         0, 800, false, "motor_command",
          [](const TelemetryData &data)
          { return data.motor_command; }},
 
         {"V_EMF vs TIME",
          "Voltage", "V",
          QColor(200, 100, 255), QColor(220, 150, 255), // Bright purple - voltage
-         -20, 20, true, "v_emf",
+         0, 16, false, "v_emf",
          [](const TelemetryData &data)
          { return data.v_emf; }},
 
         {"DELTA V_EMF vs TIME",
          "Delta V", "V",
          QColor(255, 150, 200), QColor(255, 180, 220), // Bright pink - delta voltage
-         -5, 5, true, "delta_v_emf",
+         0, 16, false, "delta_v_emf",
          [](const TelemetryData &data)
          { return data.delta_v_emf; }}};
 }
@@ -226,8 +219,6 @@ void AerospaceDataVisualizer::createCharts()
 
         // Create chart using enhanced base class
         auto chart = std::make_unique<ChartBase>(config);
-
-        // Add to layout in 3x2 grid with better spacing
         int row = static_cast<int>(i / 3);
         int col = static_cast<int>(i % 3);
         main_layout_->addWidget(chart.get(), row, col);
@@ -407,15 +398,13 @@ void AerospaceDataVisualizer::setMinorGridVisible(bool visible)
     }
 }
 
-// NEW: Get current configuration
 bool AerospaceDataVisualizer::isSmoothCurvesEnabled() const
 {
     if (!charts_.empty() && charts_[0])
     {
-        // Return the configuration from the first chart as they should all be the same
-        return true; // This would need to be properly implemented in ChartBase
+        return true;
     }
-    return true; // Default value
+    return true;
 }
 
 double AerospaceDataVisualizer::getCurrentTimeWindow() const

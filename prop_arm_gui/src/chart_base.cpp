@@ -353,7 +353,7 @@ void ChartBase::initializeWithZeroData()
     for (int i = 0; i < num_initial_points; ++i)
     {
         double timestamp = start_time_ + (i * config_.time_window_sec) / num_initial_points;
-        double initial_value = (config_.y_min + config_.y_max) / 2.0;
+        double initial_value = 0.0;
         data_points_.push_back(DataPoint(timestamp, initial_value));
     }
 
