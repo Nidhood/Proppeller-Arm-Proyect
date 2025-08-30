@@ -1,6 +1,3 @@
-% Script: pole_zero_prop_arm.m
-% Plot pole–zero map with labels (poles = red x, zeros = blue o)
-
 close all; clear; clc;
 
 % ----------------- Parameters -----------------

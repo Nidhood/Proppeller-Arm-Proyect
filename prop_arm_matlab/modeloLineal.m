@@ -1,12 +1,3 @@
-% ========== arm_propeller_LINEAR_0p5s_delay_to_90deg_OFFSET_10V.m ==========
-% Modelo lineal (variables incrementales) alrededor del equilibrio (hover).
-% Entradas: Paso / Rampa / Parabola / Seno.
-% CAMBIO CLAVE:
-%   - La referencia v_ref arranca en v_pwm0 y, tras el delay, solo sube
-%     hasta 10 V con la forma elegida: v_ref = v_pwm0 + (10 - v_pwm0)*r_base(t).
-%   - La simulación usa u = v_ref - v_pwm0 (incremental). Antes del delay: u=0.
-%   - PWM digital parte en duty_eq y respeta saturación [0,1].
-
 close all; clear; clc;
 
 %% ---------------- Parámetros físicos ----------------
