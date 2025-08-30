@@ -1,11 +1,3 @@
-% ========== arm_propeller_NL_0p5s_delay_to_90deg.m ==========
-% Modelo NO lineal (sin cambios), PWM digital, 4 entradas (Paso/Rampa/Parábola/Seno)
-% Requisitos:
-%  - Retardo de 0.5 s (entrada=0 hasta t=0.5 s)
-%  - Subir desde 0 hasta 90° (pi/2 rad) y detener simulación al cruzar pi/2
-%  - 4 figuras separadas con los 5 subplots (v_ref, PWM digital, Vpwm_avg vs v_emf, omega_a, theta)
-%  - Unidades: theta [rad], omega [rad/s], voltajes [V]
-
 close all; clear; clc;
 
 %% ---------------- Parámetros físicos (tuyos) ----------------
