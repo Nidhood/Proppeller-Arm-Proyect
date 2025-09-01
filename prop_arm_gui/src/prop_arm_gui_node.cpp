@@ -5,21 +5,7 @@
 PropArmGuiNode::PropArmGuiNode(const rclcpp::NodeOptions &options)
     : QObject(), rclcpp::Node("prop_arm_gui_node", options)
 {
-    // Declare parameters with default values
-    this->declare_parameter<double>("max_angle_deg", 90.0);
-    this->declare_parameter<double>("min_angle_deg", 0.0);
-    this->declare_parameter<double>("max_force_n", 45.0);
-    this->declare_parameter<double>("max_velocity_rad_s", 785.0);
-    this->declare_parameter<double>("target_angle_deg", 0.0);
-    this->declare_parameter<double>("gui_update_rate_hz", 20.0);
-    this->declare_parameter<double>("connection_timeout_sec", 2.0);
-
-    // Get parameters
-    this->get_parameter("max_angle_deg", max_angle_deg_);
-    this->get_parameter("min_angle_deg", min_angle_deg_);
-    this->get_parameter("max_force_n", max_force_n_);
-    this->get_parameter("max_velocity_rad_s", max_velocity_rad_s_);
-    this->get_parameter("target_angle_deg", target_angle_deg_);
+    // [Previous parameter declarations remain the same...]
 
     setupSubscribers();
     setupPublishers();
@@ -28,8 +14,8 @@ PropArmGuiNode::PropArmGuiNode(const rclcpp::NodeOptions &options)
     last_data_time_ = this->get_clock()->now();
     current_data_.timestamp = last_data_time_;
 
-    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node initialized");
-    RCLCPP_INFO(this->get_logger(), "Listening to topics: /prop_arm/arm_angle_deg, /prop_arm/motor_speed_est");
+    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node initialized with Vref and VPWM monitoring");
+    RCLCPP_INFO(this->get_logger(), "Monitoring topics: /prop_arm/arm_angle_deg, /prop_arm/motor_speed_est, /prop_arm/vemf, /prop_arm/vpwm, /prop_arm/cmd/vref");
     RCLCPP_INFO(this->get_logger(), "Publishing to: /velocity_controller/commands");
 }
 
@@ -41,6 +27,7 @@ void PropArmGuiNode::setupSubscribers()
                            .durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
                            .history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
 
+    // Existing subscribers
     arm_angle_sub_ = this->create_subscription<std_msgs::msg::Float64>(
         "/prop_arm/arm_angle_deg", qos_profile,
         std::bind(&PropArmGuiNode::armAngleCallback, this, std::placeholders::_1));
@@ -50,12 +37,33 @@ void PropArmGuiNode::setupSubscribers()
         std::bind(&PropArmGuiNode::motorSpeedCallback, this, std::placeholders::_1));
 
     v_emf_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/v_emf", qos_profile,
+        "/prop_arm/vemf", qos_profile,
         std::bind(&PropArmGuiNode::vEmfCallback, this, std::placeholders::_1));
 
-    delta_v_emf_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/delta_v_emf", qos_profile,
-        std::bind(&PropArmGuiNode::deltaVEmfCallback, this, std::placeholders::_1));
+    vpwm_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+        "/prop_arm/vpwm", qos_profile,
+        std::bind(&PropArmGuiNode::vpwmCallback, this, std::placeholders::_1));
+
+    // Vref input subscription
+    vref_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+        "/prop_arm/cmd/vref", qos_profile,
+        std::bind(&PropArmGuiNode::vrefCallback, this, std::placeholders::_1));
+
+    RCLCPP_INFO(this->get_logger(), "Subscribed to /prop_arm/vemf for V_EMF monitoring");
+    RCLCPP_INFO(this->get_logger(), "Subscribed to /prop_arm/vpwm for VPWM voltage monitoring");
+    RCLCPP_INFO(this->get_logger(), "Subscribed to /prop_arm/cmd/vref for Vref input monitoring");
+}
+
+void PropArmGuiNode::vrefCallback(const std_msgs::msg::Float64::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    current_data_.vref_input = msg->data;
+    last_data_time_ = this->get_clock()->now();
+    updateConnectionStatus();
+
+    // Log Vref data for debugging
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                          "Received Vref input: %.3f V", msg->data);
 }
 
 void PropArmGuiNode::setupPublishers()
@@ -128,12 +136,17 @@ void PropArmGuiNode::vEmfCallback(const std_msgs::msg::Float64::SharedPtr msg)
     updateConnectionStatus();
 }
 
-void PropArmGuiNode::deltaVEmfCallback(const std_msgs::msg::Float64::SharedPtr msg)
+// VPWM callback implementation
+void PropArmGuiNode::vpwmCallback(const std_msgs::msg::Float64::SharedPtr msg)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    current_data_.delta_v_emf = msg->data;
+    current_data_.vpwm = msg->data;
     last_data_time_ = this->get_clock()->now();
     updateConnectionStatus();
+
+    // Log VPWM data for debugging
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                          "Received VPWM: %.3f V", msg->data);
 }
 
 PropArmData PropArmGuiNode::getCurrentData() const

@@ -8,7 +8,7 @@
 
 AerospaceDataVisualizer::AerospaceDataVisualizer(std::shared_ptr<rclcpp::Node> node, QWidget *parent)
     : QWidget(parent),
-      update_mutex_(new QMutex()), // FIXED: Initialize in correct order
+      update_mutex_(new QMutex()),
       last_update_time_(0),
       ros_node_(node)
 {
@@ -16,24 +16,21 @@ AerospaceDataVisualizer::AerospaceDataVisualizer(std::shared_ptr<rclcpp::Node> n
     setupUI();
     createCharts();
 
-    // Optimized update frequency for better performance with smooth curves
     update_timer_ = new QTimer(this);
     update_timer_->setSingleShot(false);
-    update_timer_->setInterval(50); // 20 FPS for smooth spline updates
+    update_timer_->setInterval(50);
 
-    // Enhanced timer callback with smooth curve support
     connect(update_timer_, &QTimer::timeout, this, [this]()
             {
-                // Minimal processing - just check if we need updates
+                
                 double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-                if (current_time - last_update_time_ > 0.05) // Update every 50ms for smoother curves
+                if (current_time - last_update_time_ > 0.05)
                 {
-                    // Updates are handled directly in onDataReceived
+                
                 } });
     update_timer_->start();
     setMinimumSize(1400, 900);
 
-    // Enhanced styling with support for smooth curves
     setStyleSheet(QString(R"(
         QWidget {
             background-color: rgb(0, 0, 0);
@@ -63,12 +60,10 @@ void AerospaceDataVisualizer::loadConfiguration()
     {
         try
         {
-            // Load parameters with optimized defaults for smooth curves
             time_window_sec_ = ros_node_->get_parameter_or("visualization.time_window_sec", 30.0);
-            max_points_ = ros_node_->get_parameter_or("visualization.max_plot_points", static_cast<int>(800)); // Increased for smooth curves
-            update_rate_ms_ = ros_node_->get_parameter_or("visualization.update_rate_ms", 50);                 // Faster for smooth updates
+            max_points_ = ros_node_->get_parameter_or("visualization.max_plot_points", static_cast<int>(800));
+            update_rate_ms_ = ros_node_->get_parameter_or("visualization.update_rate_ms", 50);
 
-            // NEW: Smooth curve configuration
             bool use_smooth_curves = ros_node_->get_parameter_or("visualization.use_smooth_curves", true);
             bool show_minor_grid = ros_node_->get_parameter_or("visualization.show_minor_grid", true);
 
@@ -83,7 +78,6 @@ void AerospaceDataVisualizer::loadConfiguration()
         {
             RCLCPP_WARN(ros_node_->get_logger(),
                         "Failed to load some visualization parameters: %s. Using enhanced defaults.", e.what());
-            // Enhanced defaults
             time_window_sec_ = 30.0;
             max_points_ = 800;
             update_rate_ms_ = 50;
@@ -91,7 +85,6 @@ void AerospaceDataVisualizer::loadConfiguration()
     }
     else
     {
-        // Enhanced defaults
         time_window_sec_ = 30.0;
         max_points_ = 800;
         update_rate_ms_ = 50;
@@ -155,10 +148,12 @@ ChartBase::ChartConfig AerospaceDataVisualizer::createChartConfig(
 void AerospaceDataVisualizer::setupUI()
 {
     main_layout_ = new QGridLayout(this);
-    main_layout_->setSpacing(8);                      // Optimized spacing for better visibility
-    main_layout_->setContentsMargins(12, 12, 12, 12); // Optimized margins
+    main_layout_->setSpacing(8);
+    main_layout_->setContentsMargins(12, 12, 12, 12);
 
     // Enhanced chart configurations with professional color scheme
+    // 6 CHARTS in 2x3 layout: ARM ANGLE, CONTROL ERROR, MOTOR SPEED (row 1)
+    //                         VREF (Input), V_EMF, VPWM (row 2)
     chart_setups_ = {
         {"ARM ANGLE vs TIME",
          "Angle", "degrees",
@@ -181,26 +176,26 @@ void AerospaceDataVisualizer::setupUI()
          [](const TelemetryData &data)
          { return std::abs(data.motor_speed); }},
 
-        {"MOTOR COMMAND vs TIME",
-         "Command", "rad/s",
-         QColor(255, 200, 0), QColor(255, 220, 100), // Bright yellow/orange - command signal
-         0, 800, false, "motor_command",
+        {"VREF (Input) vs TIME",
+         "Vref", "V",
+         QColor(255, 120, 200), QColor(255, 170, 220), // Bright pink/magenta - reference voltage
+         0, 12, false, "vref_input",
          [](const TelemetryData &data)
-         { return data.motor_command; }},
+         { return data.vref_input; }},
 
         {"V_EMF vs TIME",
-         "Voltage", "V",
-         QColor(200, 100, 255), QColor(220, 150, 255), // Bright purple - voltage
+         "V_EMF", "V",
+         QColor(200, 100, 255), QColor(220, 150, 255), // Bright purple - EMF voltage
          0, 16, false, "v_emf",
          [](const TelemetryData &data)
          { return data.v_emf; }},
 
-        {"DELTA V_EMF vs TIME",
-         "Delta V", "V",
-         QColor(255, 150, 200), QColor(255, 180, 220), // Bright pink - delta voltage
-         0, 16, false, "delta_v_emf",
+        {"VPWM vs TIME",
+         "VPWM", "V",
+         QColor(0, 255, 255), QColor(100, 255, 255), // Bright cyan - PWM signal
+         0, 12, false, "vpwm",
          [](const TelemetryData &data)
-         { return data.delta_v_emf; }}};
+         { return data.vpwm; }}};
 }
 
 void AerospaceDataVisualizer::createCharts()
@@ -219,44 +214,48 @@ void AerospaceDataVisualizer::createCharts()
 
         // Create chart using enhanced base class
         auto chart = std::make_unique<ChartBase>(config);
-        int row = static_cast<int>(i / 3);
-        int col = static_cast<int>(i % 3);
-        main_layout_->addWidget(chart.get(), row, col);
 
+        // Layout for 6 charts in 2x3 grid:
+        // Row 0: ARM ANGLE (0,0), CONTROL ERROR (0,1), MOTOR SPEED (0,2)
+        // Row 1: VREF Input (1,0), V_EMF (1,1), VPWM (1,2)
+        int row = static_cast<int>(i / 3); // 0 for first 3 charts, 1 for last 3
+        int col = static_cast<int>(i % 3); // 0, 1, 2 cycle
+
+        main_layout_->addWidget(chart.get(), row, col);
         charts_.push_back(std::move(chart));
     }
 
     if (ros_node_)
     {
         RCLCPP_INFO(ros_node_->get_logger(),
-                    "Created %zu enhanced charts with smooth curves and advanced grid", charts_.size());
+                    "Created %zu enhanced charts in 2x3 layout with Vref, V_EMF, and VPWM signals", charts_.size());
     }
 }
 
 void AerospaceDataVisualizer::onDataReceived(double arm_angle, double motor_speed, double v_emf,
-                                             double delta_v_emf, double error, double target_angle,
-                                             double motor_command)
+                                             double error, double target_angle,
+                                             double vpwm, double vref_input)
 {
     QMutexLocker locker(update_mutex_);
 
     // Optimized throttling for smooth curve updates
     double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    if (current_time - last_update_time_ < 0.05) // Update every 50ms for smooth curves
+    if (current_time - last_update_time_ < 0.05)
     {
         return;
     }
 
-    // Create telemetry data structure
+    // Create telemetry data structure with all fields
     TelemetryData data;
     data.timestamp = current_time;
     data.datetime = QDateTime::currentDateTime();
     data.arm_angle = arm_angle;
     data.motor_speed = motor_speed;
     data.v_emf = v_emf;
-    data.delta_v_emf = delta_v_emf;
     data.error = error;
     data.target_angle = target_angle;
-    data.motor_command = motor_command;
+    data.vpwm = vpwm;
+    data.vref_input = vref_input;
 
     // Enhanced data validation for smooth curves
     auto isValidValue = [](double value) -> bool
@@ -364,7 +363,7 @@ void AerospaceDataVisualizer::updateTheme()
     }
 }
 
-// NEW: Enhanced configuration methods
+// Enhanced configuration methods
 void AerospaceDataVisualizer::setSmoothCurves(bool enabled)
 {
     QMutexLocker locker(update_mutex_);

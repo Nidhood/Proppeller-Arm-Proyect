@@ -20,6 +20,7 @@
 #include <QGuiApplication>
 #include <QMetaObject>
 #include <QThread>
+#include <QStatusBar>
 #include <memory>
 #include <future>
 
@@ -77,12 +78,13 @@ private:
     QPushButton *stabilize_btn_;
     QPushButton *refresh_btn_;
 
-    // Monitoring panel components
+    // Enhanced monitoring panel components with voltage focus
     QGroupBox *monitor_group_;
     QLabel *arm_angle_value_;
     QLabel *motor_speed_value_;
     QLabel *v_emf_value_;
-    QLabel *delta_v_emf_value_;
+    QLabel *vref_value_; // Vref input voltage display
+    QLabel *vpwm_value_; // VPWM voltage display (only one)
     QLabel *error_value_;
     QLabel *motor_cmd_value_;
     QProgressBar *angle_progress_;

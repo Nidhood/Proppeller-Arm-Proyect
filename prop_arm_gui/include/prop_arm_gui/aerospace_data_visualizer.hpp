@@ -19,10 +19,10 @@ struct TelemetryData
     double arm_angle;
     double motor_speed;
     double v_emf;
-    double delta_v_emf;
     double error;
     double target_angle;
-    double motor_command;
+    double vpwm; // Only VPWM (previously vpwm_input)
+    double vref_input;
 };
 
 class AerospaceDataVisualizer : public QWidget
@@ -33,21 +33,21 @@ public:
     explicit AerospaceDataVisualizer(std::shared_ptr<rclcpp::Node> node = nullptr, QWidget *parent = nullptr);
     ~AerospaceDataVisualizer();
 
-    // Data reception interface
+    // Data reception interface - Updated to use only vpwm
     void onDataReceived(double arm_angle, double motor_speed, double v_emf,
-                        double delta_v_emf, double error, double target_angle,
-                        double motor_command);
+                        double error, double target_angle,
+                        double vpwm, double vref_input);
 
     // Configuration methods
     void clearData();
     void setTimeWindow(double seconds);
     void updateTheme();
 
-    // NEW: Enhanced configuration methods
+    // Enhanced configuration methods
     void setSmoothCurves(bool enabled);
     void setMinorGridVisible(bool visible);
 
-    // NEW: Configuration getters
+    // Configuration getters
     bool isSmoothCurvesEnabled() const;
     double getCurrentTimeWindow() const;
     size_t getMaxPoints() const;
@@ -93,7 +93,7 @@ private:
     size_t max_points_;
     int update_rate_ms_;
 
-    // NEW: Enhanced configuration options
+    // Enhanced configuration options
     bool smooth_curves_enabled_;
     bool minor_grid_enabled_;
 };

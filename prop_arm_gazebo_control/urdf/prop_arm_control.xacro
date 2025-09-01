@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="prop_arm_control">
 
-    <!-- Gazebo plugin for ros2_control -->
     <gazebo>
         <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
             <parameters>$(find prop_arm_gazebo_control)/config/ros2_controllers_motor_force.yaml</parameters>
@@ -10,17 +9,20 @@
         </plugin>
     </gazebo>
 
-    <!-- ROS 2 Control System Interface -->
     <ros2_control name="PropArmSystem" type="system">
         <hardware>
             <plugin>prop_arm_gazebo_control/PropArmHardware</plugin>
             <param name="robot_namespace">prop_arm</param>
             <param name="actuator_index">0</param>
             <param name="max_rot_velocity_radps">785.0</param>
+            <param name="V_bus">12.0</param>
+            <param name="K_e">0.0055</param>
+            <param name="vref_min">0.0</param>
+            <param name="vref_max">12.0</param>
+            <param name="duty_max">0.95</param>
+            <param name="pwm_frequency_hz">0.4</param>
         </hardware>
 
-
-        <!-- Define the joint that will be controlled -->
         <joint name="arm_link_joint">
             <command_interface name="velocity">
                 <param name="min">0.0</param>
@@ -30,7 +32,5 @@
             <state_interface name="velocity"/>
             <state_interface name="effort"/>
         </joint>
-
     </ros2_control>
-
 </robot>

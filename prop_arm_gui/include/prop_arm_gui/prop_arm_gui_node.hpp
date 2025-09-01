@@ -15,11 +15,11 @@ struct PropArmData
     double arm_angle_deg = 0.0;
     double motor_speed_est = 0.0;
     double v_emf = 0.0;
-    double delta_v_emf = 0.0;
     double motor_command = 0.0;
     double error = 0.0;
     double target_angle = 0.0;
-
+    double vpwm = 0.0;       // Only VPWM (previously vpwm_input)
+    double vref_input = 0.0; // Vref input voltage
     rclcpp::Time timestamp;
     bool valid = false;
 };
@@ -61,7 +61,8 @@ private:
     void armAngleCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void motorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void vEmfCallback(const std_msgs::msg::Float64::SharedPtr msg);
-    void deltaVEmfCallback(const std_msgs::msg::Float64::SharedPtr msg);
+    void vpwmCallback(const std_msgs::msg::Float64::SharedPtr msg);
+    void vrefCallback(const std_msgs::msg::Float64::SharedPtr msg);
 
     // Publishers
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr velocity_cmd_pub_;
@@ -71,7 +72,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr arm_angle_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr motor_speed_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr v_emf_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr delta_v_emf_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr vpwm_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr vref_sub_;
 
     // Data management
     mutable std::mutex data_mutex_;
