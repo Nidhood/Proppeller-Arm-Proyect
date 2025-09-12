@@ -55,19 +55,7 @@ def generate_launch_description():
             launch_arguments={'use_sim_time': use_sim_time}.items()
         ),
 
-        # 2. Bridge /clock from Gazebo:
-        Node(
-            package='ros_gz_bridge',
-            executable='parameter_bridge',
-            name='clock_bridge',
-            arguments=[
-                '/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock'
-            ],
-            parameters=[{ 'use_sim_time': use_sim_time }],
-            output='screen',
-        ),
-
-        # 3. Publish URDF:
+        # 2. Publish URDF:
         TimerAction(
             period=1.0,
             actions=[ IncludeLaunchDescription(
@@ -76,7 +64,7 @@ def generate_launch_description():
             ) ]
         ),
 
-        # 4. Spawn the robot in Gazebo:
+        # 3. Spawn the robot in Gazebo:
         TimerAction(
             period=3.0,
             actions=[ IncludeLaunchDescription(
@@ -85,7 +73,7 @@ def generate_launch_description():
             ) ]
         ),
 
-        # 5. Load controllers:
+        # 4. Load controllers:
         TimerAction(
             period=6.0,
             actions=[ IncludeLaunchDescription(
@@ -94,7 +82,7 @@ def generate_launch_description():
             ) ]
         ),
 
-        # 6. Launch PropArm GUI with fixed delay:
+        # 5. Launch PropArm GUI with fixed delay:
         TimerAction(
             period=8.0, 
             actions=[ IncludeLaunchDescription(

@@ -26,7 +26,7 @@ namespace prop_arm_ctrl
         declare_parameter("deriv_tau", deriv_tau_);
         declare_parameter("omega0_rad_s", omega0_rad_s_);
 
-        std::vector<double> Kdef{15.0, 8.0, 2.0}; // K=[K1 K2 K3]
+        std::vector<double> Kdef{15.0, 8.0, 2.0};
         declare_parameter<std::vector<double>>("K", Kdef);
 
         declare_parameter("topic_angle_deg", topic_angle_deg_);
