@@ -223,30 +223,19 @@ namespace prop_arm_gazebo_control
     PropArmHardware::write(const rclcpp::Time &, const rclcpp::Duration &period)
     {
         const double dt = std::max(0.0, period.seconds());
-
-        // 1) Duty a partir de Vref (promedio)
         double vref_local = 0.0;
         {
             std::scoped_lock lk(io_mtx_);
             vref_local = std::clamp(vref_cmd_, vref_min_, vref_max_);
         }
         duty_eff_ = (V_bus > 1e-12) ? std::clamp(vref_local / V_bus, 0.0, duty_max_) : 0.0;
-
-        // 2) PWM cuadrada para visualización (0 / V_bus)
         if (dt > 0.0)
             stepPwm(dt);
         vpwm_sq_ = (pwm_phase_ < duty_eff_) ? V_bus : 0.0;
-
-        // 3) Modelo eléctrico promediado (dinámica 1er orden sobre v_emf)
         const double v_pwm_avg = duty_eff_ * V_bus;
         if (dt > 0.0)
             integrateEmf(dt, v_pwm_avg);
-
-        // 4) Velocidad estimada (constante en estacionario si Vref es constante)
-        omega_est_ = (K_e > 0.0) ? (vemf_ / K_e) : 0.0;
         const double omega_cmd = std::clamp(omega_est_, 0.0, max_rot_vel_);
-
-        // 5) Telemetría y mando a Gazebo
         publishTelemetry();
 
         gz::msgs::Actuators msg;
@@ -278,16 +267,15 @@ namespace prop_arm_gazebo_control
 
     void PropArmHardware::integrateEmf(double dt, double v_pwm_avg)
     {
-        // dv_emf/dt = ( alpha*(v_pwm_avg - v_emf) - K_f*v_emf ) / J_m
-        const double alpha = (K_m * K_e) / (R_s + R_m); // [N*m*s/V] -> consistente con unidades
-        const double a = (alpha / J_m);
-        const double b = (K_f / J_m);
-
-        // Integrador explícito estable para dt pequeño (frecuencia de update ros2_control)
-        const double dv = (a * (v_pwm_avg - vemf_) - b * vemf_) * dt;
-        vemf_ += dv;
-
-        // Seguridad numérica
+        const double tau_motor = 0.05;
+        const double omega_target = (v_pwm_avg / V_bus) * max_rot_vel_;
+        const double alpha = dt / (tau_motor + dt);
+        omega_est_ += alpha * (omega_target - omega_est_);
+        vemf_ = K_e * omega_est_;
+        if (omega_est_ < 0.0)
+            omega_est_ = 0.0;
+        if (omega_est_ > max_rot_vel_)
+            omega_est_ = max_rot_vel_;
         if (vemf_ < 0.0)
             vemf_ = 0.0;
         if (vemf_ > V_bus)

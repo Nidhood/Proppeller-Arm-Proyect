@@ -42,6 +42,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/prop_arm_hardware_interface_plugin.xml")
     pluginlib_export_plugin_description_file(gz_ros2_control prop_arm_hardware_interface_plugin.xml)
 endif()
 
+# Angle Hold State-Space Controller
 add_executable(angle_hold_ss_controller
     src/angle_hold_ss_controller.cpp
 )
@@ -52,6 +53,17 @@ target_include_directories(angle_hold_ss_controller PUBLIC
 )
 ament_target_dependencies(angle_hold_ss_controller rclcpp std_msgs)
 target_link_libraries(angle_hold_ss_controller Eigen3::Eigen)
+
+# Test Input Command Node
+add_executable(test_input_command
+    src/test_input_command.cpp
+)
+target_compile_features(test_input_command PUBLIC c_std_99 cxx_std_17)
+target_include_directories(test_input_command PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(test_input_command rclcpp std_msgs)
 
 install(TARGETS
     prop_arm_hardware_interface
@@ -64,6 +76,7 @@ install(TARGETS
 # Executables
 install(TARGETS
     angle_hold_ss_controller
+    test_input_command
     DESTINATION lib/${PROJECT_NAME}
 )
 
