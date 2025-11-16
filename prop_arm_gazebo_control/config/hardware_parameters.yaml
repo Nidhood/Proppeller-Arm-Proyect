@@ -1,0 +1,5 @@
+hardware_parameters:
+  ros__parameters:
+    position_ouput_sub_name: "/sim_arm/angle_rad"
+    velocity_output_sub_name: "/sim_arm/motor_vel_rad"
+    pwm_input_pub_name:  "/sim_arm/pwm_us"

@@ -1,0 +1,12 @@
+Propeller,Model,uxcell 10x5 Nylon,-,Two-blade fixed-pitch propeller
+Propeller,Material,Nylon,-,Reinforced polymer composite
+Propeller,Diameter,254,mm,Measured tip to tip (10 inches)
+Propeller,Pitch,127,mm,Axial pitch distance (5 inches)
+Propeller,Hub Thickness,"9,6",mm,Thickness at center hub
+Propeller,Bore Diameter,6,mm,Central mounting hole
+Propeller,Blade Count,2,blades,Number of blades
+Propeller,Weight,"15,3",g,Typical mass per propeller
+Propeller,Length (overall),254,mm,Equivalent to diameter
+Propeller,Rotation,CW,-,Clockwise viewed from motor side
+Propeller,Recommended Motor Range,700–900,KV,Optimal for D3536 class motors
+Propeller,Max RPM,11000,RPM,Safe operating limit for nylon material

@@ -21,10 +21,14 @@
 #include <QMetaObject>
 #include <QThread>
 #include <QStatusBar>
+#include <QFileDialog>
+#include <QMessageBox>
 #include <memory>
 #include <future>
 
+
 #include "prop_arm_gui/prop_arm_gui_node.hpp"
+#include "prop_arm_gui/data_exporter.hpp"
 
 // Forward declaration
 class AerospaceDataVisualizer;
@@ -34,8 +38,6 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    void applyConfigToControls();
-
     explicit MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent = nullptr);
     ~MainWindow() = default;
 
@@ -46,11 +48,19 @@ private slots:
     void onStopClicked();
     void onStabilizeClicked();
     void onRefreshClicked();
+    void onExportDataClicked();
+    
+    // Recording slots
+    void onStartRecordingClicked();
+    void onStopRecordingClicked();
+    void onRecordingStarted(double duration);
+    void onRecordingProgress(double remaining_time, size_t point_count);
+    void onRecordingCompleted(size_t point_count, double duration);
 
 private:
     void setupUI();
     void setupStyles();
-    void setupUbuntuScreenGeometry(); // Updated method for Qt6 screen handling
+    void setupUbuntuScreenGeometry();
     void setupControlTab();
     void setupControlPanel();
     void setupMonitoringPanel();
@@ -77,14 +87,21 @@ private:
     QPushButton *stop_btn_;
     QPushButton *stabilize_btn_;
     QPushButton *refresh_btn_;
+    QPushButton *export_btn_;
+    
+    // Recording components
+    QDoubleSpinBox *recording_duration_spinbox_;
+    QPushButton *start_recording_btn_;
+    QPushButton *stop_recording_btn_;
+    QLabel *recording_status_label_;
+    QProgressBar *recording_progress_bar_;
 
-    // Enhanced monitoring panel components with voltage focus
+    // Monitoring panel components
     QGroupBox *monitor_group_;
     QLabel *arm_angle_value_;
     QLabel *motor_speed_value_;
-    QLabel *v_emf_value_;
-    QLabel *vref_value_; // Vref input voltage display
-    QLabel *vpwm_value_; // VPWM voltage display (only one)
+    QLabel *pwm_input_value_;
+    QLabel *duty_cycle_value_;
     QLabel *error_value_;
     QLabel *motor_cmd_value_;
     QProgressBar *angle_progress_;
@@ -95,14 +112,14 @@ private:
     QLabel *control_mode_;
     QLabel *system_status_;
 
-    // Enhanced aerospace color scheme
-    const QString PRIMARY_COLOR = "#1a365d";    // Deep space blue
-    const QString SECONDARY_COLOR = "#2563eb";  // Electric blue
-    const QString SUCCESS_COLOR = "#00ff88";    // Neon green
-    const QString WARNING_COLOR = "#ff8c00";    // Neon orange
-    const QString DANGER_COLOR = "#ff3366";     // Neon red
-    const QString BACKGROUND_COLOR = "#080a0f"; // Deep dark
-    const QString CARD_COLOR = "#1e293b";       // Dark card
-    const QString TEXT_COLOR = "#e2e8f0";       // Light text
-    const QString ACCENT_COLOR = "#00ccff";     // Cyan accent
+    // Aerospace color scheme
+    const QString PRIMARY_COLOR = "#1a365d";
+    const QString SECONDARY_COLOR = "#2563eb";
+    const QString SUCCESS_COLOR = "#00ff88";
+    const QString WARNING_COLOR = "#ff8c00";
+    const QString DANGER_COLOR = "#ff3366";
+    const QString BACKGROUND_COLOR = "#080a0f";
+    const QString CARD_COLOR = "#1e293b";
+    const QString TEXT_COLOR = "#e2e8f0";
+    const QString ACCENT_COLOR = "#00ccff";
 };

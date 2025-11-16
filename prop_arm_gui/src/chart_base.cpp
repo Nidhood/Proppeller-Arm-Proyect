@@ -123,6 +123,8 @@ ChartBase::ChartBase(const ChartConfig &config, QWidget *parent)
       main_series_(nullptr),
       trend_series_(nullptr),
       smooth_series_(nullptr),
+      sim_main_series_(nullptr),
+      sim_smooth_series_(nullptr),
       x_axis_(nullptr),
       y_axis_(nullptr),
       data_mutex_(new QMutex()),
@@ -136,7 +138,7 @@ ChartBase::ChartBase(const ChartConfig &config, QWidget *parent)
       data_initialized_(false),
       hover_active_(false),
       hover_persistent_(false),
-      hover_fixed_time_absolute_(-1.0), // FIXED: Usar tiempo absoluto
+      hover_fixed_time_absolute_(-1.0),
       cached_hover_value_(0.0),
       cached_hover_time_(-1.0)
 {
@@ -221,14 +223,16 @@ void ChartBase::setupAxes()
 
 void ChartBase::setupSeries()
 {
+    // REAL DATA SERIES (primary - solid, thicker)
     if (config_.use_smooth_curves)
     {
         smooth_series_ = new QSplineSeries();
-        smooth_series_->setName("Data");
+        smooth_series_->setName("Real Data");
         smooth_series_->setColor(config_.primary_color);
 
         QPen pen(config_.primary_color);
         pen.setWidth(2);
+        pen.setStyle(Qt::SolidLine);
         smooth_series_->setPen(pen);
 
         chart_->addSeries(smooth_series_);
@@ -238,11 +242,12 @@ void ChartBase::setupSeries()
     else
     {
         main_series_ = new QLineSeries();
-        main_series_->setName("Data");
+        main_series_->setName("Real Data");
         main_series_->setColor(config_.primary_color);
 
         QPen pen(config_.primary_color);
-        pen.setWidth(1);
+        pen.setWidth(2);
+        pen.setStyle(Qt::SolidLine);
         main_series_->setPen(pen);
 
         chart_->addSeries(main_series_);
@@ -250,8 +255,43 @@ void ChartBase::setupSeries()
         main_series_->attachAxis(y_axis_);
     }
 
+    // SIMULATION DATA SERIES (secondary - dashed, thinner)
+    if (config_.use_smooth_curves)
+    {
+        sim_smooth_series_ = new QSplineSeries();
+        sim_smooth_series_->setName("Simulation Data");
+        sim_smooth_series_->setColor(config_.sim_color);
+
+        QPen sim_pen(config_.sim_color);
+        sim_pen.setWidth(2);
+        sim_pen.setStyle(Qt::DashLine);
+        sim_smooth_series_->setPen(sim_pen);
+
+        chart_->addSeries(sim_smooth_series_);
+        sim_smooth_series_->attachAxis(x_axis_);
+        sim_smooth_series_->attachAxis(y_axis_);
+    }
+    else
+    {
+        sim_main_series_ = new QLineSeries();
+        sim_main_series_->setName("Simulation Data");
+        sim_main_series_->setColor(config_.sim_color);
+
+        QPen sim_pen(config_.sim_color);
+        sim_pen.setWidth(2);
+        sim_pen.setStyle(Qt::DashLine);
+        sim_main_series_->setPen(sim_pen);
+
+        chart_->addSeries(sim_main_series_);
+        sim_main_series_->attachAxis(x_axis_);
+        sim_main_series_->attachAxis(y_axis_);
+    }
+
+    // Reserve buffers
     series_points_buffer_.reserve(config_.max_points);
     spline_points_buffer_.reserve(config_.max_points);
+    sim_series_points_buffer_.reserve(config_.max_points);
+    sim_spline_points_buffer_.reserve(config_.max_points);
 }
 
 void ChartBase::setupAdvancedGrid()
@@ -321,6 +361,10 @@ void ChartBase::initializeMemoryPool()
     series_points_buffer_.reserve(optimal_buffer_size_);
     spline_points_buffer_.clear();
     spline_points_buffer_.reserve(optimal_buffer_size_);
+    sim_series_points_buffer_.clear();
+    sim_series_points_buffer_.reserve(optimal_buffer_size_);
+    sim_spline_points_buffer_.clear();
+    sim_spline_points_buffer_.reserve(optimal_buffer_size_);
     pool_write_index_ = 0;
 }
 
@@ -345,6 +389,7 @@ void ChartBase::initializeWithZeroData()
     QMutexLocker locker(data_mutex_);
 
     data_points_.clear();
+    sim_data_points_.clear();
 
     double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     start_time_ = current_time;
@@ -355,6 +400,7 @@ void ChartBase::initializeWithZeroData()
         double timestamp = start_time_ + (i * config_.time_window_sec) / num_initial_points;
         double initial_value = 0.0;
         data_points_.push_back(DataPoint(timestamp, initial_value));
+        sim_data_points_.push_back(DataPoint(timestamp, initial_value));
     }
 
     data_initialized_ = true;
@@ -395,10 +441,44 @@ void ChartBase::addDataPoint(double value, double timestamp)
     update_pending_ = true;
 }
 
+void ChartBase::addSimDataPoint(double value, double timestamp)
+{
+    QMutexLocker locker(data_mutex_);
+
+    if (timestamp < 0)
+    {
+        timestamp = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    }
+
+    DataPoint point(timestamp, value);
+
+    if (!data_initialized_)
+    {
+        initializeWithZeroData();
+    }
+
+    sim_data_points_.push_back(point);
+
+    double current_time = timestamp;
+    double cutoff_time = current_time - config_.time_window_sec;
+
+    while (!sim_data_points_.empty() && sim_data_points_.front().timestamp < cutoff_time)
+    {
+        sim_data_points_.pop_front();
+    }
+
+    while (sim_data_points_.size() > config_.max_points)
+    {
+        sim_data_points_.pop_front();
+    }
+
+    update_pending_ = true;
+}
+
 void ChartBase::updateSeriesOptimized()
 {
+    // CRITICAL FIX: Update REAL data series
     series_points_buffer_.clear();
-
     for (const auto &point : data_points_)
     {
         double relative_time = point.timestamp - start_time_;
@@ -413,6 +493,9 @@ void ChartBase::updateSeriesOptimized()
     {
         main_series_->replace(series_points_buffer_);
     }
+
+    // CRITICAL FIX: ALWAYS update SIMULATION data series
+    updateSimSeries();
 }
 
 void ChartBase::updateSplineSeries()
@@ -443,6 +526,48 @@ void ChartBase::updateSplineSeries()
     }
 
     smooth_series_->replace(spline_points_buffer_);
+}
+
+void ChartBase::updateSimSeries()
+{
+    sim_series_points_buffer_.clear();
+
+    for (const auto &point : sim_data_points_)
+    {
+        double relative_time = point.timestamp - start_time_;
+        sim_series_points_buffer_.append(QPointF(relative_time, point.value));
+    }
+
+    if (config_.use_smooth_curves && sim_smooth_series_)
+    {
+        if (sim_series_points_buffer_.size() <= 10)
+        {
+            sim_smooth_series_->replace(sim_series_points_buffer_);
+            return;
+        }
+
+        std::vector<QPointF> control_points;
+        control_points.reserve(sim_series_points_buffer_.size());
+
+        for (const auto &point : sim_series_points_buffer_)
+        {
+            control_points.push_back(point);
+        }
+
+        auto spline_points = calculateSplinePoints(control_points);
+
+        sim_spline_points_buffer_.clear();
+        for (const auto &point : spline_points)
+        {
+            sim_spline_points_buffer_.append(point);
+        }
+
+        sim_smooth_series_->replace(sim_spline_points_buffer_);
+    }
+    else if (sim_main_series_)
+    {
+        sim_main_series_->replace(sim_series_points_buffer_);
+    }
 }
 
 std::vector<QPointF> ChartBase::calculateSplinePoints(const std::vector<QPointF> &control_points) const
@@ -485,7 +610,6 @@ std::vector<QPointF> ChartBase::calculateSplinePoints(const std::vector<QPointF>
 
 void ChartBase::performUpdate()
 {
-    // Update series/axes only when data changed
     if (update_pending_)
     {
         QMutexLocker locker(data_mutex_);
@@ -495,15 +619,12 @@ void ChartBase::performUpdate()
         emit dataUpdated();
     }
 
-    // Always refresh persistent hover so the vertical line/label
-    // track the sliding window even if the mouse is still.
     if (hover_persistent_ && hover_fixed_time_absolute_ > 0.0)
     {
         updatePersistentHover();
     }
 }
 
-// FIXED: Guardar tiempo absoluto, no relativo
 void ChartBase::onHoverUpdate(QPointF chart_position, QPoint scene_position, bool valid)
 {
     current_chart_pos_ = chart_position;
@@ -512,7 +633,6 @@ void ChartBase::onHoverUpdate(QPointF chart_position, QPoint scene_position, boo
 
     if (valid)
     {
-        // CRITICAL FIX: Guardar el tiempo ABSOLUTO, no el relativo del chart
         hover_fixed_time_absolute_ = start_time_ + chart_position.x();
         hover_persistent_ = true;
         hover_fixed_scene_x_ = scene_position.x();
@@ -527,7 +647,6 @@ void ChartBase::onHoverUpdate(QPointF chart_position, QPoint scene_position, boo
     }
 }
 
-// FIXED: Usar tiempo absoluto fijo para calcular posición relativa actual
 void ChartBase::updateHoverDisplay()
 {
     if (!chart_view_ || !chart_view_->scene())
@@ -536,12 +655,10 @@ void ChartBase::updateHoverDisplay()
     if (hover_fixed_time_absolute_ <= 0.0)
         return;
 
-    // Calcular tiempo relativo actual para la posición fija absoluta
     QPointF chart_at_x = sceneToChartCoords(QPoint(hover_fixed_scene_x_, current_scene_pos_.y()));
     double current_relative_time = chart_at_x.x();
-    // Keep absolute time consistent with current mapping
     hover_fixed_time_absolute_ = start_time_ + current_relative_time;
-    // Verificar que esté dentro del rango visible actual
+
     double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     double time_range = current_time - start_time_;
 
@@ -557,21 +674,17 @@ void ChartBase::updateHoverDisplay()
         x_max = config_.time_window_sec;
     }
 
-    // Solo mostrar hover si la posición fija está en el rango visible
     if (current_relative_time < x_min || current_relative_time > x_max)
     {
         cleanupHoverElements();
         return;
     }
 
-    // Encontrar valor interpolado para el tiempo absoluto fijo
     QPointF snapped_point = findNearestPointOnCurve(hover_fixed_time_absolute_);
     snapped_chart_pos_ = QPointF(current_relative_time, snapped_point.y());
 
-    // Convertir a coordenadas de escena
     QPoint snapped_scene_pos = chartToSceneCoords(snapped_chart_pos_);
 
-    // Crear elementos con el tiempo original para mostrar
     double display_time = current_relative_time;
     createHoverElements(chart_view_->scene(), snapped_chart_pos_,
                         snapped_scene_pos, snapped_point.y(), display_time);
@@ -604,19 +717,16 @@ void ChartBase::createHoverElements(QGraphicsScene *scene, const QPointF &,
     if (!chart_->plotArea().contains(scene_pos))
         return;
 
-    // Línea vertical
     chart_view_->hover_line_ = scene->addLine(
         scene_pos.x(), chart_->plotArea().top(),
         scene_pos.x(), chart_->plotArea().bottom(),
         QPen(TEXT_SECONDARY, 1, Qt::DashLine));
 
-    // Punto en la curva
     chart_view_->hover_point_ = scene->addEllipse(
         scene_pos.x() - 4, scene_pos.y() - 4, 8, 8,
         QPen(config_.primary_color, 2),
         QBrush(config_.primary_color));
 
-    // Texto con información
     QString text = QString("Time: %1s\nValue: %2 %3")
                        .arg(time, 0, 'f', 2)
                        .arg(value, 0, 'f', 3)
@@ -630,7 +740,6 @@ void ChartBase::createHoverElements(QGraphicsScene *scene, const QPointF &,
     font.setBold(true);
     chart_view_->hover_text_->setFont(font);
 
-    // Posicionamiento inteligente del texto
     QRectF text_rect = chart_view_->hover_text_->boundingRect();
     QPointF text_pos(scene_pos.x() + 15, scene_pos.y() - text_rect.height() - 5);
 
@@ -652,13 +761,11 @@ void ChartBase::createHoverElements(QGraphicsScene *scene, const QPointF &,
     chart_view_->hover_text_->setPos(text_pos);
 }
 
-// FIXED: Buscar por tiempo absoluto
 QPointF ChartBase::findNearestPointOnCurve(double absolute_target_time) const
 {
     if (data_points_.empty())
         return QPointF(0, (config_.y_min + config_.y_max) / 2.0);
 
-    // Buscar por tiempo absoluto directamente
     auto it = std::lower_bound(data_points_.begin(), data_points_.end(), absolute_target_time,
                                [](const DataPoint &point, double time)
                                {
@@ -674,7 +781,6 @@ QPointF ChartBase::findNearestPointOnCurve(double absolute_target_time) const
         return QPointF(data_points_.back().timestamp - start_time_, data_points_.back().value);
     }
 
-    // Interpolación lineal
     auto prev_it = it - 1;
     double t1 = prev_it->timestamp;
     double t2 = it->timestamp;
@@ -745,6 +851,7 @@ void ChartBase::clearData()
 {
     QMutexLocker locker(data_mutex_);
     data_points_.clear();
+    sim_data_points_.clear();
     start_time_ = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     last_update_time_ = 0;
     last_hover_update_time_ = 0;
@@ -752,7 +859,6 @@ void ChartBase::clearData()
     hover_update_pending_ = false;
     data_initialized_ = false;
 
-    // Reset hover state pero mantener posición si está activo
     if (hover_persistent_ && hover_fixed_time_absolute_ > 0.0)
     {
         cached_hover_value_ = 0.0;
@@ -776,6 +882,8 @@ void ChartBase::clearData()
                               {
         if (main_series_) main_series_->clear();
         if (smooth_series_) smooth_series_->clear();
+        if (sim_main_series_) sim_main_series_->clear();
+        if (sim_smooth_series_) sim_smooth_series_->clear();
         x_axis_->setRange(0, config_.time_window_sec);
         y_axis_->setRange(config_.y_min, config_.y_max);
         
@@ -792,6 +900,7 @@ void ChartBase::setTimeWindow(double seconds)
 
     QMutexLocker locker(data_mutex_);
     data_points_.clear();
+    sim_data_points_.clear();
     data_initialized_ = false;
     initializeMemoryPool();
     initializeWithZeroData();
@@ -848,6 +957,7 @@ void ChartBase::setSmoothCurves(bool enabled)
     QMetaObject::invokeMethod(this, [this]()
                               {
         QVector<QPointF> current_data = series_points_buffer_;
+        QVector<QPointF> current_sim_data = sim_series_points_buffer_;
         
         if (main_series_) {
             chart_->removeSeries(main_series_);
@@ -859,6 +969,16 @@ void ChartBase::setSmoothCurves(bool enabled)
             delete smooth_series_;
             smooth_series_ = nullptr;
         }
+        if (sim_main_series_) {
+            chart_->removeSeries(sim_main_series_);
+            delete sim_main_series_;
+            sim_main_series_ = nullptr;
+        }
+        if (sim_smooth_series_) {
+            chart_->removeSeries(sim_smooth_series_);
+            delete sim_smooth_series_;
+            sim_smooth_series_ = nullptr;
+        }
         
         setupSeries();
         
@@ -867,6 +987,14 @@ void ChartBase::setSmoothCurves(bool enabled)
                 smooth_series_->replace(current_data);
             } else if (main_series_) {
                 main_series_->replace(current_data);
+            }
+        }
+        
+        if (!current_sim_data.isEmpty()) {
+            if (config_.use_smooth_curves && sim_smooth_series_) {
+                sim_smooth_series_->replace(current_sim_data);
+            } else if (sim_main_series_) {
+                sim_main_series_->replace(current_sim_data);
             }
         }
         

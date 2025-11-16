@@ -25,6 +25,21 @@ find_package(gz-msgs10 REQUIRED)
 
 include_directories(include)
 
+# ============================================================================
+# MOTOR SPEED MODEL LIBRARY
+# ============================================================================
+add_library(motor_speed_model SHARED
+    src/motor_speed_model.cpp
+)
+target_compile_features(motor_speed_model PUBLIC c_std_99 cxx_std_17)
+target_include_directories(motor_speed_model PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+# ============================================================================
+# HARDWARE INTERFACE LIBRARY
+# ============================================================================
 add_library(prop_arm_hardware_interface SHARED
     src/prop_arm_hardware_interface.cpp 
 )
@@ -33,6 +48,11 @@ target_include_directories(prop_arm_hardware_interface PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+target_link_libraries(prop_arm_hardware_interface
+    motor_speed_model
+)
+
 ament_target_dependencies(prop_arm_hardware_interface
     hardware_interface pluginlib rclcpp rclcpp_lifecycle gz_ros2_control std_msgs
     gz-sim8 gz-transport13 gz-msgs10
@@ -41,6 +61,10 @@ ament_target_dependencies(prop_arm_hardware_interface
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/prop_arm_hardware_interface_plugin.xml")
     pluginlib_export_plugin_description_file(gz_ros2_control prop_arm_hardware_interface_plugin.xml)
 endif()
+
+# ============================================================================
+# EXECUTABLES
+# ============================================================================
 
 # Angle Hold State-Space Controller
 add_executable(angle_hold_ss_controller
@@ -54,18 +78,28 @@ target_include_directories(angle_hold_ss_controller PUBLIC
 ament_target_dependencies(angle_hold_ss_controller rclcpp std_msgs)
 target_link_libraries(angle_hold_ss_controller Eigen3::Eigen)
 
-# Test Input Command Node
-add_executable(test_input_command
-    src/test_input_command.cpp
-)
-target_compile_features(test_input_command PUBLIC c_std_99 cxx_std_17)
-target_include_directories(test_input_command PUBLIC
+# Test Input Command Node:
+add_executable(step_test_input_node src/step_test_input_node.cpp)
+ament_target_dependencies(step_test_input_node rclcpp std_msgs)
+target_include_directories(step_test_input_node PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-ament_target_dependencies(test_input_command rclcpp std_msgs)
+
+# PID Controller Node (from Arduino .ino logic)
+add_executable(pid_controller_node src/pid_controller_node.cpp)
+ament_target_dependencies(pid_controller_node rclcpp std_msgs)
+target_include_directories(pid_controller_node PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+# ============================================================================
+# INSTALLATION
+# ============================================================================
 
 install(TARGETS
+    motor_speed_model
     prop_arm_hardware_interface
     EXPORT export_${PROJECT_NAME}
     ARCHIVE DESTINATION lib
@@ -76,7 +110,8 @@ install(TARGETS
 # Executables
 install(TARGETS
     angle_hold_ss_controller
-    test_input_command
+    step_test_input_node
+    pid_controller_node
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -85,7 +120,7 @@ install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/ OPTIONAL)
 install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config/ OPTIONAL)
 install(DIRECTORY launch urdf config include src 
     DESTINATION share/${PROJECT_NAME}
-    )
+)
 install(DIRECTORY include/ DESTINATION include/)
 
 # Install plugin XML only if it exists
@@ -97,6 +132,7 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(
     hardware_interface pluginlib rclcpp rclcpp_lifecycle gz_ros2_control
 )
+ament_export_libraries(motor_speed_model)
 
 # Tests
 if(BUILD_TESTING)

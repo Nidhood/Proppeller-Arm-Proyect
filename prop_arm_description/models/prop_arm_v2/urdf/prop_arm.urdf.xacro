@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="prop_arm">
+
+  <!-- World link -->
+  <link name="world"/>
+
+  <!-- Main robot link -->
+  <link name="base_link">
+    <collision name="base_collision">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/collisions/base.stl" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.343"/>
+      <inertia ixx="0.24075" ixy="-0.00000" ixz="0.00000" 
+               iyy="0.23379" iyz="0.03671" 
+               izz="0.01482"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00883 0.00000 0.19143"/>
+    </inertial>
+    <visual name="base">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/visuals/base.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Arm link -->
+  <link name="arm_link">
+    <collision name="arm_collision">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/collisions/arm.stl" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.402"/>
+      <inertia ixx="0.00050" ixy="-0.00000" ixz="0.00129" 
+               iyy="0.02111" iyz="-0.00000" 
+               izz="0.02133"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.19518 -0.00011 0.03646"/>
+    </inertial>
+    <visual name="arm">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/visuals/arm.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Propeller link-->
+  <link name="prop_link">
+    <collision name="prop_collision">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/collisions/prop.stl" scale="1 1 1"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.020"/>
+      <inertia ixx="0.00000043" ixy="0.00000194" ixz="0.00000000" 
+               iyy="0.00007266" iyz="-0.00000000" 
+               izz="0.00007301"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00454"/>
+    </inertial>
+    <visual name="prop">
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/visuals/prop.dae" scale="1 1 1"/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Joint between world and base -->
+  <joint name="world_base_joint" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+  </joint>
+
+  <!-- Joint between base and arm -->
+  <joint name="arm_link_joint" type="revolute"> 
+    <axis xyz="0 1 0"/>
+    <origin rpy="0 -1.57080 -1.57080" xyz="0.00001 -0.00000 0.45833"/>
+    <limit lower="-3.1416" upper="3.1416" effort="1500.0" velocity="10.0"/>
+    <dynamics damping="0.0" friction="0.0"/>
+    <parent link="base_link"/>
+    <child link="arm_link"/>
+  </joint>
+
+  <!-- Joint between arm and propeller -->
+  <joint name="prop_link_joint" type="continuous">
+    <dynamics damping="0.01"/>
+    <origin rpy="0 0 0" xyz="-0.42152 -0.00001 0.09510"/>
+    <parent link="arm_link"/>
+    <child link="prop_link"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Include materials for Gazebo -->
+  <xacro:include filename="$(find prop_arm_gazebo)/urdf/prop_arm_materials.xacro"/>
+
+  <!-- Include gazebo plugins -->
+  <xacro:include filename="$(find prop_arm_gazebo_plugins)/urdf/prop_arm_gazebo_plugins.xacro"/>
+
+  <!-- Include control interface -->
+  <xacro:include filename="$(find prop_arm_gazebo_control)/urdf/prop_arm_control.xacro"/>
+</robot>

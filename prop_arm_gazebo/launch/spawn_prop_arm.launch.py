@@ -83,15 +83,15 @@ def generate_launch_description():
         ),
 
         # 5. Launch PropArm GUI with fixed delay:
-        TimerAction(
-            period=8.0, 
-            actions=[ IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(gui_launch),
-                launch_arguments={
-                    'use_sim_time': use_sim_time,
-                    'log_level': 'info'
-                }.items()
-            ) ],
-            condition=IfCondition(launch_gui)
-        ),
+        # TimerAction(
+        #     period=8.0, 
+        #     actions=[ IncludeLaunchDescription(
+        #         PythonLaunchDescriptionSource(gui_launch),
+        #         launch_arguments={
+        #             'use_sim_time': use_sim_time,
+        #             'log_level': 'info'
+        #         }.items()
+        #     ) ],
+        #     condition=IfCondition(launch_gui)
+        # ),
     ])

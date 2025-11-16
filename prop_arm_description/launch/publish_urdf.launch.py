@@ -15,7 +15,7 @@ def generate_launch_description():
     xacro_file = PathJoinSubstitution([
         FindPackageShare('prop_arm_description'),
         'models',
-        'prop_arm',
+        'prop_arm_v2',
         'urdf',
         'prop_arm.urdf.xacro'
     ])

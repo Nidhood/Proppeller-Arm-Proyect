@@ -1,69 +1,94 @@
 #include "prop_arm_gui/prop_arm_gui_node.hpp"
+#include "prop_arm_gui/data_recorder.hpp"
 #include <cmath>
 #include <algorithm>
 
 PropArmGuiNode::PropArmGuiNode(const rclcpp::NodeOptions &options)
     : QObject(), rclcpp::Node("prop_arm_gui_node", options)
 {
-    // [Previous parameter declarations remain the same...]
+    // Initialize system timestamps
+    system_start_timepoint_ = std::chrono::steady_clock::now();
+    system_start_time_ = 0.0;
+
+    // Initialize data recorder
+    data_recorder_ = std::make_unique<DataRecorder>();
 
     setupSubscribers();
     setupPublishers();
 
-    // Initialize timestamps
+    // Initialize timestamps and data
     last_data_time_ = this->get_clock()->now();
+    current_data_.system_timestamp = getSystemTimestamp();
+    current_data_.datetime = QDateTime::currentDateTime();
     current_data_.timestamp = last_data_time_;
 
-    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node initialized with Vref and VPWM monitoring");
-    RCLCPP_INFO(this->get_logger(), "Monitoring topics: /prop_arm/arm_angle_deg, /prop_arm/motor_speed_est, /prop_arm/vemf, /prop_arm/vpwm, /prop_arm/cmd/vref");
-    RCLCPP_INFO(this->get_logger(), "Publishing to: /velocity_controller/commands");
+    // Initialize simulation data to zeros
+    current_data_.sim_arm_angle_deg = 0.0;
+    current_data_.sim_motor_speed_rad_s = 0.0;
+    current_data_.sim_pwm_input_us = 0.0;
+    current_data_.sim_duty_cycle_percent = 0.0;
+
+    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node initialized");
+    RCLCPP_INFO(this->get_logger(), "System start time: %.6f", system_start_time_);
+    RCLCPP_INFO(this->get_logger(), "Monitoring REAL topics:");
+    RCLCPP_INFO(this->get_logger(), "  - /arm/angle_rad");
+    RCLCPP_INFO(this->get_logger(), "  - /arm/motor_vel_rad");
+    RCLCPP_INFO(this->get_logger(), "  - /esc/pwm_us_fb");
+    RCLCPP_INFO(this->get_logger(), "Monitoring SIMULATION topics:");
+    RCLCPP_INFO(this->get_logger(), "  - /arm_sim/angle_rad");
+    RCLCPP_INFO(this->get_logger(), "  - /arm_sim/motor_vel_rad");
+    RCLCPP_INFO(this->get_logger(), "  - /arm_sim/esc/pwm_us_fb");
+}
+
+PropArmGuiNode::~PropArmGuiNode()
+{
+    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node shutting down");
+    data_recorder_.reset();
+}
+
+double PropArmGuiNode::getSystemTimestamp() const
+{
+    auto now = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+        now - system_start_timepoint_);
+    return duration.count() / 1000000.0;
 }
 
 void PropArmGuiNode::setupSubscribers()
 {
-    // Use sensor data QoS for real-time performance
+    // Use BEST_EFFORT for real-time data (like your Gazebo simulation)
     auto qos_profile = rclcpp::QoS(100)
                            .reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
                            .durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
                            .history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
 
-    // Existing subscribers
+    // REAL data subscribers
     arm_angle_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/arm_angle_deg", qos_profile,
+        "/arm/angle_rad", qos_profile,
         std::bind(&PropArmGuiNode::armAngleCallback, this, std::placeholders::_1));
 
     motor_speed_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/motor_speed_est", qos_profile,
+        "/arm/motor_vel_rad", qos_profile,
         std::bind(&PropArmGuiNode::motorSpeedCallback, this, std::placeholders::_1));
 
-    v_emf_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/vemf", qos_profile,
-        std::bind(&PropArmGuiNode::vEmfCallback, this, std::placeholders::_1));
+    pwm_input_sub_ = this->create_subscription<std_msgs::msg::UInt16>(
+        "/esc/pwm_us_fb", qos_profile,
+        std::bind(&PropArmGuiNode::pwmInputCallback, this, std::placeholders::_1));
 
-    vpwm_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/vpwm", qos_profile,
-        std::bind(&PropArmGuiNode::vpwmCallback, this, std::placeholders::_1));
+    // SIMULATION data subscribers - FIXED TOPIC NAMES
+    sim_arm_angle_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+        "/arm_sim/angle_rad", qos_profile,
+        std::bind(&PropArmGuiNode::simArmAngleCallback, this, std::placeholders::_1));
 
-    // Vref input subscription
-    vref_sub_ = this->create_subscription<std_msgs::msg::Float64>(
-        "/prop_arm/cmd/vref", qos_profile,
-        std::bind(&PropArmGuiNode::vrefCallback, this, std::placeholders::_1));
+    sim_motor_speed_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+        "/arm_sim/motor_vel_rad", qos_profile,
+        std::bind(&PropArmGuiNode::simMotorSpeedCallback, this, std::placeholders::_1));
 
-    RCLCPP_INFO(this->get_logger(), "Subscribed to /prop_arm/vemf for V_EMF monitoring");
-    RCLCPP_INFO(this->get_logger(), "Subscribed to /prop_arm/vpwm for VPWM voltage monitoring");
-    RCLCPP_INFO(this->get_logger(), "Subscribed to /prop_arm/cmd/vref for Vref input monitoring");
-}
+    sim_pwm_input_sub_ = this->create_subscription<std_msgs::msg::UInt16>(
+        "/arm_sim/esc/pwm_us_fb", qos_profile,
+        std::bind(&PropArmGuiNode::simPwmInputCallback, this, std::placeholders::_1));
 
-void PropArmGuiNode::vrefCallback(const std_msgs::msg::Float64::SharedPtr msg)
-{
-    std::lock_guard<std::mutex> lock(data_mutex_);
-    current_data_.vref_input = msg->data;
-    last_data_time_ = this->get_clock()->now();
-    updateConnectionStatus();
-
-    // Log Vref data for debugging
-    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                          "Received Vref input: %.3f V", msg->data);
+    RCLCPP_INFO(this->get_logger(), "All subscribers configured with BEST_EFFORT QoS");
 }
 
 void PropArmGuiNode::setupPublishers()
@@ -72,11 +97,15 @@ void PropArmGuiNode::setupPublishers()
                            .reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE)
                            .durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
 
-    velocity_cmd_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
-        "/velocity_controller/commands", qos_profile);
+    velocity_cmd_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+        "/arm/motor_vel_rad", qos_profile);
 
-    force_cmd_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
-        "/motor_force_controller/commands", qos_profile);
+    RCLCPP_INFO(this->get_logger(), "Publishing velocity commands to /arm/motor_vel_rad");
+}
+
+double PropArmGuiNode::calculateDutyCycle(double pwm_us) const
+{
+    return (pwm_us / PWM_PERIOD_US) * 100.0;
 }
 
 void PropArmGuiNode::updateConnectionStatus()
@@ -97,56 +126,129 @@ void PropArmGuiNode::armAngleCallback(const std_msgs::msg::Float64::SharedPtr ms
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
 
-    current_data_.arm_angle_deg = msg->data;
+    current_data_.system_timestamp = getSystemTimestamp();
+    current_data_.datetime = QDateTime::currentDateTime();
     current_data_.timestamp = this->get_clock()->now();
+
+    current_data_.arm_angle_deg = msg->data * 180.0 / M_PI;
     current_data_.valid = true;
 
-    // Calculate error
-    current_data_.error = target_angle_deg_ - msg->data;
+    current_data_.error = target_angle_deg_ - current_data_.arm_angle_deg;
     current_data_.target_angle = target_angle_deg_;
 
-    // Add to history
     history_data_.push_back(current_data_);
     if (history_data_.size() > MAX_HISTORY_SIZE)
     {
         history_data_.pop_front();
     }
 
+    if (data_recorder_ && data_recorder_->isRecording())
+    {
+        data_recorder_->recordDataPoint(current_data_);
+
+        double remaining = data_recorder_->getRemainingTime();
+        size_t count = data_recorder_->getRecordedPointCount();
+
+        QMetaObject::invokeMethod(this, [this, remaining, count]()
+                                  { emit recordingProgress(remaining, count); }, Qt::QueuedConnection);
+
+        if (!data_recorder_->isRecording() && count > 0)
+        {
+            double duration = data_recorder_->getRecordingDuration();
+            QMetaObject::invokeMethod(this, [this, count, duration]()
+                                      { emit recordingCompleted(count, duration); }, Qt::QueuedConnection);
+        }
+    }
+
     last_data_time_ = current_data_.timestamp;
     updateConnectionStatus();
 
-    // Emit signal for GUI update (thread-safe)
     QMetaObject::invokeMethod(this, [this]()
                               { emit dataUpdated(); }, Qt::QueuedConnection);
+
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                          "REAL Arm angle: %.2f° (%.4f rad)",
+                          current_data_.arm_angle_deg, msg->data);
 }
 
 void PropArmGuiNode::motorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    current_data_.motor_speed_est = msg->data;
-    last_data_time_ = this->get_clock()->now();
-    updateConnectionStatus();
-}
 
-void PropArmGuiNode::vEmfCallback(const std_msgs::msg::Float64::SharedPtr msg)
-{
-    std::lock_guard<std::mutex> lock(data_mutex_);
-    current_data_.v_emf = msg->data;
-    last_data_time_ = this->get_clock()->now();
-    updateConnectionStatus();
-}
-
-// VPWM callback implementation
-void PropArmGuiNode::vpwmCallback(const std_msgs::msg::Float64::SharedPtr msg)
-{
-    std::lock_guard<std::mutex> lock(data_mutex_);
-    current_data_.vpwm = msg->data;
+    current_data_.motor_speed_rad_s = msg->data;
+    current_data_.system_timestamp = getSystemTimestamp();
+    current_data_.datetime = QDateTime::currentDateTime();
     last_data_time_ = this->get_clock()->now();
     updateConnectionStatus();
 
-    // Log VPWM data for debugging
     RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                          "Received VPWM: %.3f V", msg->data);
+                          "REAL Motor velocity: %.2f rad/s", msg->data);
+}
+
+void PropArmGuiNode::pwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(data_mutex_);
+
+    current_data_.pwm_input_us = static_cast<double>(msg->data);
+    current_data_.duty_cycle_percent = calculateDutyCycle(current_data_.pwm_input_us);
+    current_data_.system_timestamp = getSystemTimestamp();
+    current_data_.datetime = QDateTime::currentDateTime();
+
+    last_data_time_ = this->get_clock()->now();
+    updateConnectionStatus();
+
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                         "REAL PWM: %u µs, Duty: %.2f%%",
+                         msg->data, current_data_.duty_cycle_percent);
+
+    QMetaObject::invokeMethod(this, [this]()
+                              { emit dataUpdated(); }, Qt::QueuedConnection);
+}
+
+// SIMULATION CALLBACKS - NOW WITH PROPER LOGGING AND DATA UPDATE
+void PropArmGuiNode::simArmAngleCallback(const std_msgs::msg::Float64::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(data_mutex_);
+
+    current_data_.sim_arm_angle_deg = msg->data * 180.0 / M_PI;
+
+    // CRITICAL: Emit signal to update GUI
+    QMetaObject::invokeMethod(this, [this]()
+                              { emit dataUpdated(); }, Qt::QueuedConnection);
+
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                         "SIM Arm angle: %.2f° (%.4f rad)",
+                         current_data_.sim_arm_angle_deg, msg->data);
+}
+
+void PropArmGuiNode::simMotorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(data_mutex_);
+
+    current_data_.sim_motor_speed_rad_s = msg->data;
+
+    // CRITICAL: Emit signal to update GUI
+    QMetaObject::invokeMethod(this, [this]()
+                              { emit dataUpdated(); }, Qt::QueuedConnection);
+
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                         "SIM Motor velocity: %.2f rad/s", msg->data);
+}
+
+void PropArmGuiNode::simPwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg)
+{
+    std::lock_guard<std::mutex> lock(data_mutex_);
+
+    current_data_.sim_pwm_input_us = static_cast<double>(msg->data);
+    current_data_.sim_duty_cycle_percent = calculateDutyCycle(current_data_.sim_pwm_input_us);
+
+    // CRITICAL: Emit signal to update GUI
+    QMetaObject::invokeMethod(this, [this]()
+                              { emit dataUpdated(); }, Qt::QueuedConnection);
+
+    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                         "SIM PWM: %u µs, Duty: %.2f%%",
+                         msg->data, current_data_.sim_duty_cycle_percent);
 }
 
 PropArmData PropArmGuiNode::getCurrentData() const
@@ -183,65 +285,64 @@ void PropArmGuiNode::sendAngleCommand(double angle_degrees)
     target_angle_deg_ = std::clamp(angle_degrees, min_angle_deg_, max_angle_deg_);
     control_mode_ = "ANGLE CONTROL";
 
-    // Convert angle to velocity command (simple proportional control)
     double error = target_angle_deg_ - current_data_.arm_angle_deg;
     double velocity_cmd = error * 5.0;
     velocity_cmd = std::clamp(velocity_cmd, -max_velocity_rad_s_, max_velocity_rad_s_);
 
-    auto msg = std_msgs::msg::Float64MultiArray();
-    msg.data = {velocity_cmd};
+    auto msg = std_msgs::msg::Float64();
+    msg.data = velocity_cmd;
     velocity_cmd_pub_->publish(msg);
 
     std::lock_guard<std::mutex> lock(data_mutex_);
     current_data_.motor_command = velocity_cmd;
-}
 
-void PropArmGuiNode::sendForceCommand(double force_newtons)
-{
-    force_newtons = std::clamp(force_newtons, 0.0, max_force_n_);
-    control_mode_ = "Force Control";
-    auto msg = std_msgs::msg::Float64MultiArray();
-    msg.data = {force_newtons};
-    force_cmd_pub_->publish(msg);
-    std::lock_guard<std::mutex> lock(data_mutex_);
-    current_data_.motor_command = force_newtons;
+    RCLCPP_DEBUG(this->get_logger(),
+                 "Angle command: target=%.2f°, current=%.2f°, error=%.2f°, vel_cmd=%.2f rad/s",
+                 target_angle_deg_, current_data_.arm_angle_deg, error, velocity_cmd);
 }
 
 void PropArmGuiNode::sendVelocityCommand(double velocity_rad_s)
 {
     velocity_rad_s = std::clamp(velocity_rad_s, -max_velocity_rad_s_, max_velocity_rad_s_);
     control_mode_ = "VELOCITY CONTROL";
+
     const rclcpp::Time now_time = now();
-    const bool time_ok = (!last_velocity_pub_time_.nanoseconds()) || ((now_time - last_velocity_pub_time_).seconds() >= VELOCITY_CMD_DEBOUNCE_S);
-    const bool value_ok = (std::isnan(last_velocity_cmd_)) || (std::fabs(velocity_rad_s - last_velocity_cmd_) >= VELOCITY_CMD_MIN_DELTA);
+    const bool time_ok = (!last_velocity_pub_time_.nanoseconds()) ||
+                         ((now_time - last_velocity_pub_time_).seconds() >= VELOCITY_CMD_DEBOUNCE_S);
+    const bool value_ok = (std::isnan(last_velocity_cmd_)) ||
+                          (std::fabs(velocity_rad_s - last_velocity_cmd_) >= VELOCITY_CMD_MIN_DELTA);
+
     if (!(time_ok && value_ok))
     {
         return;
     }
+
     last_velocity_cmd_ = velocity_rad_s;
     last_velocity_pub_time_ = now_time;
-    auto msg = std_msgs::msg::Float64MultiArray();
-    msg.data = {velocity_rad_s};
+
+    auto msg = std_msgs::msg::Float64();
+    msg.data = velocity_rad_s;
     velocity_cmd_pub_->publish(msg);
+
     std::lock_guard<std::mutex> lock(data_mutex_);
     current_data_.motor_command = velocity_rad_s;
+
+    RCLCPP_DEBUG(this->get_logger(), "Velocity command: %.2f rad/s", velocity_rad_s);
 }
 
 void PropArmGuiNode::sendStopCommand()
 {
     control_mode_ = "STOPPED";
 
-    auto velocity_msg = std_msgs::msg::Float64MultiArray();
-    velocity_msg.data = {0.0};
+    auto velocity_msg = std_msgs::msg::Float64();
+    velocity_msg.data = 0.0;
     velocity_cmd_pub_->publish(velocity_msg);
-
-    auto force_msg = std_msgs::msg::Float64MultiArray();
-    force_msg.data = {0.0};
-    force_cmd_pub_->publish(force_msg);
 
     std::lock_guard<std::mutex> lock(data_mutex_);
     current_data_.motor_command = 0.0;
     target_angle_deg_ = current_data_.arm_angle_deg;
+
+    RCLCPP_INFO(this->get_logger(), "STOP command sent");
 }
 
 bool PropArmGuiNode::isConnected() const
@@ -257,4 +358,78 @@ std::string PropArmGuiNode::getConnectionStatus() const
 std::string PropArmGuiNode::getControlMode() const
 {
     return control_mode_;
+}
+
+void PropArmGuiNode::startRecording(double duration_seconds)
+{
+    if (data_recorder_)
+    {
+        data_recorder_->startRecording(duration_seconds);
+
+        RCLCPP_INFO(this->get_logger(),
+                    "Started recording for %.1f seconds - capturing NEW data only",
+                    duration_seconds);
+
+        QMetaObject::invokeMethod(this, [this, duration_seconds]()
+                                  { emit recordingStarted(duration_seconds); }, Qt::QueuedConnection);
+    }
+}
+
+void PropArmGuiNode::stopRecording()
+{
+    if (data_recorder_)
+    {
+        size_t count = data_recorder_->getRecordedPointCount();
+        double duration = data_recorder_->getRecordingDuration();
+
+        data_recorder_->stopRecording();
+
+        RCLCPP_INFO(this->get_logger(),
+                    "Stopped recording - captured %zu points over %.2f seconds",
+                    count, duration);
+
+        QMetaObject::invokeMethod(this, [this, count, duration]()
+                                  { emit recordingCompleted(count, duration); }, Qt::QueuedConnection);
+    }
+}
+
+bool PropArmGuiNode::isRecording() const
+{
+    return data_recorder_ && data_recorder_->isRecording();
+}
+
+std::vector<PropArmData> PropArmGuiNode::getRecordedData() const
+{
+    if (data_recorder_)
+    {
+        return data_recorder_->getRecordedData();
+    }
+    return std::vector<PropArmData>();
+}
+
+size_t PropArmGuiNode::getRecordedPointCount() const
+{
+    if (data_recorder_)
+    {
+        return data_recorder_->getRecordedPointCount();
+    }
+    return 0;
+}
+
+double PropArmGuiNode::getRecordingDuration() const
+{
+    if (data_recorder_)
+    {
+        return data_recorder_->getRecordingDuration();
+    }
+    return 0.0;
+}
+
+double PropArmGuiNode::getRecordingRemainingTime() const
+{
+    if (data_recorder_)
+    {
+        return data_recorder_->getRemainingTime();
+    }
+    return 0.0;
 }

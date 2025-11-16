@@ -16,7 +16,7 @@ def generate_launch_description():
     entity_name = "prop_arm"
 
     # Define the starting position of the robot in the Gazebo simulation:
-    position = [0.0, 0.0, 0.67]
+    position = [0.0, 0.0, 0.01]
 
     # Define the orientation of the robot in the Gazebo simulation:
     orientation = [0.0, 0.0, 0.0]

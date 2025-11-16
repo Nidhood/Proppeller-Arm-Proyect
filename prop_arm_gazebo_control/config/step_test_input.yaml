@@ -1,0 +1,8 @@
+step_test_input:
+  ros__parameters:
+    rate_hz: 100.0
+    up_time_s: 15.0
+    down_time_s: 5.0
+    us_low: 1272
+    us_high: 1324
+    topic_pwm: /esc/pwm_us

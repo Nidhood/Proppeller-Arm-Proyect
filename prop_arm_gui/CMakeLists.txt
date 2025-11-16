@@ -33,17 +33,22 @@ include_directories(include)
 # Qt6 executable sources - UPDATED with base class
 set(GUI_SOURCES
     src/main.cpp
-    src/main_window.cpp
+    #src/main_window.cpp
     src/prop_arm_gui_node.cpp
     src/chart_base.cpp
+    src/data_exporter.cpp
+    src/data_recorder.cpp
     src/aerospace_data_visualizer.cpp
     src/real_time_plot.cpp
+    src/data_exporter.cpp
 )
 
 set(GUI_HEADERS
     include/prop_arm_gui/main_window.hpp
     include/prop_arm_gui/prop_arm_gui_node.hpp
     include/prop_arm_gui/chart_base.hpp
+    include/prop_arm_gui/data_exporter.hpp
+    include/prop_arm_gui/data_recorder.hpp 
     include/prop_arm_gui/aerospace_data_visualizer.hpp
     include/prop_arm_gui/real_time_plot.hpp
 )
