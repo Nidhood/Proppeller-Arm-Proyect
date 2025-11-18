@@ -9,14 +9,18 @@
 #include <QDir>
 
 MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
-    : QMainWindow(parent), ros_node_(node)
+    : QMainWindow(parent),
+      ros_node_(node),
+      angle_vs_reference_chart_(nullptr),
+      error_chart_(nullptr),
+      motor_velocity_chart_(nullptr)
 {
     setupUbuntuScreenGeometry();
     setupUI();
     setupStyles();
 
     update_timer_ = new QTimer(this);
-    update_timer_->setInterval(50);
+    update_timer_->setInterval(50); // 20 FPS para actualización fluida
     connect(update_timer_, &QTimer::timeout, this, &MainWindow::updateDisplays);
     update_timer_->start();
 
@@ -32,7 +36,6 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
                 QString("color: %1;").arg(SUCCESS_COLOR) : 
                 QString("color: %1;").arg(DANGER_COLOR)); }, Qt::QueuedConnection);
 
-        // Señales de grabación
         connect(ros_node_.get(), &PropArmGuiNode::recordingStarted,
                 this, &MainWindow::onRecordingStarted, Qt::QueuedConnection);
 
@@ -43,7 +46,7 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
                 this, &MainWindow::onRecordingCompleted, Qt::QueuedConnection);
     }
 
-    setWindowTitle("PropArm Control System - PWM & Duty Cycle Monitoring");
+    setWindowTitle("PropArm Control System - Enhanced Control Panel");
 }
 
 void MainWindow::setupUbuntuScreenGeometry()
@@ -75,14 +78,11 @@ void MainWindow::setupUI()
     main_layout->setSpacing(10);
     main_layout->setContentsMargins(10, 10, 10, 10);
 
-    // Tab widget
     tab_widget_ = new QTabWidget();
     tab_widget_->setTabPosition(QTabWidget::North);
 
-    // Control tab
     setupControlTab();
 
-    // Visualization tab
     data_visualizer_ = new AerospaceDataVisualizer(ros_node_, this);
     tab_widget_->addTab(data_visualizer_, "Real-Time Visualization");
 
@@ -94,15 +94,30 @@ void MainWindow::setupUI()
 void MainWindow::setupControlTab()
 {
     control_widget_ = new QWidget();
-    QHBoxLayout *control_layout = new QHBoxLayout(control_widget_);
-    control_layout->setSpacing(15);
-    control_layout->setContentsMargins(10, 10, 10, 10);
 
+    // LAYOUT HORIZONTAL PRINCIPAL: Comandos a la izquierda, Gráficas a la derecha
+    QHBoxLayout *main_horizontal_layout = new QHBoxLayout(control_widget_);
+    main_horizontal_layout->setSpacing(15);
+    main_horizontal_layout->setContentsMargins(10, 10, 10, 10);
+
+    // LADO IZQUIERDO: Panel de comandos (40% del ancho)
     setupControlPanel();
-    setupMonitoringPanel();
+    main_horizontal_layout->addWidget(control_group_, 2); // Peso 2
 
-    control_layout->addWidget(control_group_, 1);
-    control_layout->addWidget(monitor_group_, 1);
+    // LADO DERECHO: Gráficas (60% del ancho)
+    setupControlCharts();
+
+    QWidget *charts_container = new QWidget();
+    QVBoxLayout *charts_layout = new QVBoxLayout(charts_container);
+    charts_layout->setSpacing(10);
+    charts_layout->setContentsMargins(0, 0, 0, 0);
+
+    // Apilar las tres gráficas verticalmente
+    charts_layout->addWidget(angle_vs_reference_chart_);
+    charts_layout->addWidget(error_chart_);
+    charts_layout->addWidget(motor_velocity_chart_);
+
+    main_horizontal_layout->addWidget(charts_container, 3); // Peso 3
 
     tab_widget_->addTab(control_widget_, "Control Panel");
 }
@@ -111,50 +126,111 @@ void MainWindow::setupControlPanel()
 {
     control_group_ = new QGroupBox("Control Commands");
     QVBoxLayout *control_group_layout = new QVBoxLayout(control_group_);
+    control_group_layout->setSpacing(10);
 
-    // Angle Control Section
-    QGroupBox *angle_group = new QGroupBox("Angle Control");
+    // Control Mode
+    QGroupBox *mode_group = new QGroupBox("Control Mode");
+    QHBoxLayout *mode_layout = new QHBoxLayout(mode_group);
+    auto_mode_checkbox_ = new QCheckBox("Automatic Mode");
+    auto_mode_checkbox_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
+    connect(auto_mode_checkbox_, &QCheckBox::toggled, this, &MainWindow::onAutoModeToggled);
+    mode_layout->addWidget(auto_mode_checkbox_);
+    mode_layout->addStretch();
+
+    // Reference Angle Control
+    QGroupBox *angle_group = new QGroupBox("Reference Angle");
     QGridLayout *angle_layout = new QGridLayout(angle_group);
+    angle_layout->setSpacing(5);
 
     angle_slider_ = new QSlider(Qt::Horizontal);
     angle_slider_->setRange(-90, 90);
     angle_slider_->setValue(0);
     angle_slider_->setTickPosition(QSlider::TicksBelow);
-    angle_slider_->setTickInterval(30);
+    angle_slider_->setTickInterval(15);
 
     angle_spinbox_ = new QDoubleSpinBox();
     angle_spinbox_->setRange(-90.0, 90.0);
     angle_spinbox_->setValue(0.0);
     angle_spinbox_->setSuffix(" °");
     angle_spinbox_->setDecimals(1);
+    angle_spinbox_->setMaximumWidth(100);
 
-    angle_layout->addWidget(new QLabel("Target Angle:"), 0, 0);
+    angle_layout->addWidget(new QLabel("Angle:"), 0, 0);
     angle_layout->addWidget(angle_slider_, 0, 1);
     angle_layout->addWidget(angle_spinbox_, 0, 2);
 
-    // Velocity Control Section
-    QGroupBox *velocity_group = new QGroupBox("Velocity Control");
-    QGridLayout *velocity_layout = new QGridLayout(velocity_group);
+    // PWM Input Control
+    QGroupBox *pwm_group = new QGroupBox("PWM Input");
+    QGridLayout *pwm_layout = new QGridLayout(pwm_group);
+    pwm_layout->setSpacing(5);
 
-    velocity_slider_ = new QSlider(Qt::Horizontal);
-    velocity_slider_->setRange(-785, 785);
-    velocity_slider_->setValue(0);
-    velocity_slider_->setTickPosition(QSlider::TicksBelow);
-    velocity_slider_->setTickInterval(100);
+    pwm_slider_ = new QSlider(Qt::Horizontal);
+    pwm_slider_->setRange(1000, 2000);
+    pwm_slider_->setValue(1000);
+    pwm_slider_->setTickPosition(QSlider::TicksBelow);
+    pwm_slider_->setTickInterval(100);
 
-    velocity_spinbox_ = new QDoubleSpinBox();
-    velocity_spinbox_->setRange(-785.0, 785.0);
-    velocity_spinbox_->setValue(0.0);
-    velocity_spinbox_->setSuffix(" rad/s");
-    velocity_spinbox_->setDecimals(1);
+    pwm_spinbox_ = new QSpinBox();
+    pwm_spinbox_->setRange(1000, 2000);
+    pwm_spinbox_->setValue(1000);
+    pwm_spinbox_->setSuffix(" µs");
+    pwm_spinbox_->setMaximumWidth(100);
 
-    velocity_layout->addWidget(new QLabel("Target Velocity:"), 0, 0);
-    velocity_layout->addWidget(velocity_slider_, 0, 1);
-    velocity_layout->addWidget(velocity_spinbox_, 0, 2);
+    pwm_layout->addWidget(new QLabel("PWM:"), 0, 0);
+    pwm_layout->addWidget(pwm_slider_, 0, 1);
+    pwm_layout->addWidget(pwm_spinbox_, 0, 2);
 
-    // Recording Section
-    QGroupBox *recording_group = new QGroupBox("Data Recording");
+    // Step Signal Configuration
+    QGroupBox *step_group = new QGroupBox("Step Test");
+    QGridLayout *step_layout = new QGridLayout(step_group);
+    step_layout->setSpacing(5);
+
+    step_angle_low_spinbox_ = new QDoubleSpinBox();
+    step_angle_low_spinbox_->setRange(-90.0, 90.0);
+    step_angle_low_spinbox_->setValue(0.0);
+    step_angle_low_spinbox_->setSuffix(" °");
+    step_angle_low_spinbox_->setDecimals(1);
+
+    step_angle_high_spinbox_ = new QDoubleSpinBox();
+    step_angle_high_spinbox_->setRange(-90.0, 90.0);
+    step_angle_high_spinbox_->setValue(45.0);
+    step_angle_high_spinbox_->setSuffix(" °");
+    step_angle_high_spinbox_->setDecimals(1);
+
+    step_time_up_spinbox_ = new QDoubleSpinBox();
+    step_time_up_spinbox_->setRange(0.1, 60.0);
+    step_time_up_spinbox_->setValue(5.0);
+    step_time_up_spinbox_->setSuffix(" s");
+    step_time_up_spinbox_->setDecimals(1);
+
+    step_time_down_spinbox_ = new QDoubleSpinBox();
+    step_time_down_spinbox_->setRange(0.1, 60.0);
+    step_time_down_spinbox_->setValue(5.0);
+    step_time_down_spinbox_->setSuffix(" s");
+    step_time_down_spinbox_->setDecimals(1);
+
+    start_step_test_btn_ = new QPushButton("START");
+    start_step_test_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 6px; }").arg(SUCCESS_COLOR));
+
+    stop_step_test_btn_ = new QPushButton("STOP");
+    stop_step_test_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 6px; }").arg(DANGER_COLOR));
+    stop_step_test_btn_->setEnabled(false);
+
+    step_layout->addWidget(new QLabel("Low:"), 0, 0);
+    step_layout->addWidget(step_angle_low_spinbox_, 0, 1);
+    step_layout->addWidget(new QLabel("High:"), 0, 2);
+    step_layout->addWidget(step_angle_high_spinbox_, 0, 3);
+    step_layout->addWidget(new QLabel("Time Up:"), 1, 0);
+    step_layout->addWidget(step_time_up_spinbox_, 1, 1);
+    step_layout->addWidget(new QLabel("Down:"), 1, 2);
+    step_layout->addWidget(step_time_down_spinbox_, 1, 3);
+    step_layout->addWidget(start_step_test_btn_, 2, 0, 1, 2);
+    step_layout->addWidget(stop_step_test_btn_, 2, 2, 1, 2);
+
+    // Data Recording
+    QGroupBox *recording_group = new QGroupBox("Recording");
     QGridLayout *recording_layout = new QGridLayout(recording_group);
+    recording_layout->setSpacing(5);
 
     recording_duration_spinbox_ = new QDoubleSpinBox();
     recording_duration_spinbox_->setRange(5.0, 600.0);
@@ -162,11 +238,11 @@ void MainWindow::setupControlPanel()
     recording_duration_spinbox_->setSuffix(" s");
     recording_duration_spinbox_->setDecimals(1);
 
-    start_recording_btn_ = new QPushButton("START RECORDING");
-    start_recording_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 8px; }").arg(SUCCESS_COLOR));
+    start_recording_btn_ = new QPushButton("START REC");
+    start_recording_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 6px; }").arg(SUCCESS_COLOR));
 
-    stop_recording_btn_ = new QPushButton("STOP RECORDING");
-    stop_recording_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 8px; }").arg(WARNING_COLOR));
+    stop_recording_btn_ = new QPushButton("STOP REC");
+    stop_recording_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 6px; }").arg(WARNING_COLOR));
     stop_recording_btn_->setEnabled(false);
 
     recording_status_label_ = new QLabel("Not Recording");
@@ -175,19 +251,19 @@ void MainWindow::setupControlPanel()
     recording_progress_bar_ = new QProgressBar();
     recording_progress_bar_->setRange(0, 100);
     recording_progress_bar_->setValue(0);
-    recording_progress_bar_->setFormat("%v s remaining");
+    recording_progress_bar_->setFormat("%v s");
     recording_progress_bar_->setVisible(false);
 
     recording_layout->addWidget(new QLabel("Duration:"), 0, 0);
     recording_layout->addWidget(recording_duration_spinbox_, 0, 1);
     recording_layout->addWidget(start_recording_btn_, 0, 2);
     recording_layout->addWidget(stop_recording_btn_, 0, 3);
-    recording_layout->addWidget(new QLabel("Status:"), 1, 0);
-    recording_layout->addWidget(recording_status_label_, 1, 1, 1, 2);
+    recording_layout->addWidget(recording_status_label_, 1, 0, 1, 4);
     recording_layout->addWidget(recording_progress_bar_, 2, 0, 1, 4);
 
-    // Control Buttons
-    QHBoxLayout *button_layout = new QHBoxLayout();
+    // Action Buttons
+    QGridLayout *button_layout = new QGridLayout();
+    button_layout->setSpacing(5);
 
     stop_btn_ = new QPushButton("STOP");
     stop_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 8px; }").arg(DANGER_COLOR));
@@ -198,101 +274,108 @@ void MainWindow::setupControlPanel()
     refresh_btn_ = new QPushButton("REFRESH");
     refresh_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 8px; }").arg(SECONDARY_COLOR));
 
-    export_btn_ = new QPushButton("EXPORT RECORDED DATA");
+    export_btn_ = new QPushButton("EXPORT");
     export_btn_->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 8px; }").arg(ACCENT_COLOR));
     export_btn_->setEnabled(false);
 
-    button_layout->addWidget(stop_btn_);
-    button_layout->addWidget(stabilize_btn_);
-    button_layout->addWidget(refresh_btn_);
-    button_layout->addWidget(export_btn_);
+    button_layout->addWidget(stop_btn_, 0, 0);
+    button_layout->addWidget(stabilize_btn_, 0, 1);
+    button_layout->addWidget(refresh_btn_, 1, 0);
+    button_layout->addWidget(export_btn_, 1, 1);
 
-    // Add to control group
+    // Add all groups to main layout
+    control_group_layout->addWidget(mode_group);
     control_group_layout->addWidget(angle_group);
-    control_group_layout->addWidget(velocity_group);
+    control_group_layout->addWidget(pwm_group);
+    control_group_layout->addWidget(step_group);
     control_group_layout->addWidget(recording_group);
     control_group_layout->addLayout(button_layout);
     control_group_layout->addStretch();
 
-    // Connect signals
+    // Connections
     connect(angle_slider_, &QSlider::valueChanged, this, &MainWindow::onAngleSliderChanged);
-    connect(velocity_slider_, &QSlider::valueChanged, this, &MainWindow::onVelocitySliderChanged);
+    connect(pwm_slider_, &QSlider::valueChanged, this, &MainWindow::onPWMSliderChanged);
     connect(stop_btn_, &QPushButton::clicked, this, &MainWindow::onStopClicked);
     connect(stabilize_btn_, &QPushButton::clicked, this, &MainWindow::onStabilizeClicked);
     connect(refresh_btn_, &QPushButton::clicked, this, &MainWindow::onRefreshClicked);
     connect(export_btn_, &QPushButton::clicked, this, &MainWindow::onExportDataClicked);
-
-    // Recording signals
     connect(start_recording_btn_, &QPushButton::clicked, this, &MainWindow::onStartRecordingClicked);
     connect(stop_recording_btn_, &QPushButton::clicked, this, &MainWindow::onStopRecordingClicked);
+    connect(start_step_test_btn_, &QPushButton::clicked, this, &MainWindow::onStartStepTestClicked);
+    connect(stop_step_test_btn_, &QPushButton::clicked, this, &MainWindow::onStopStepTestClicked);
 
-    // Sync spinboxes with sliders
     connect(angle_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             [this](double value)
             { angle_slider_->setValue(static_cast<int>(value)); });
-    connect(velocity_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-            [this](double value)
-            { velocity_slider_->setValue(static_cast<int>(value)); });
+    connect(pwm_spinbox_, QOverload<int>::of(&QSpinBox::valueChanged),
+            [this](int value)
+            { pwm_slider_->setValue(value); });
 }
 
-void MainWindow::setupMonitoringPanel()
+void MainWindow::setupControlCharts()
 {
-    monitor_group_ = new QGroupBox("System Monitoring");
-    QVBoxLayout *monitor_layout = new QVBoxLayout(monitor_group_);
+    // GRÁFICA 1: Ángulo Real vs Referencia (0 a 90 grados)
+    ChartBase::ChartConfig angle_config;
+    angle_config.title = "ANGLE: Real vs Reference";
+    angle_config.y_label = "Angle";
+    angle_config.units = "degrees";
+    angle_config.primary_color = QColor(100, 200, 255); // Azul para real
+    angle_config.secondary_color = QColor(150, 220, 255);
+    angle_config.sim_color = QColor(255, 150, 100); // Naranja para referencia
+    angle_config.y_min = 0.0;
+    angle_config.y_max = 90.0;
+    angle_config.auto_scale = false;
+    angle_config.show_grid = true;
+    angle_config.time_window_sec = 30.0;
+    angle_config.max_points = 800;
+    angle_config.show_milliseconds = false;
+    angle_config.use_smooth_curves = true;
+    angle_config.show_minor_grid = true;
 
-    // Create grid for values
-    QGridLayout *values_grid = new QGridLayout();
+    angle_vs_reference_chart_ = new ChartBase(angle_config);
+    angle_vs_reference_chart_->setMinimumHeight(200);
 
-    // Arm Angle
-    values_grid->addWidget(new QLabel("Arm Angle:"), 0, 0);
-    arm_angle_value_ = new QLabel("0.0 °");
-    arm_angle_value_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14pt;").arg(ACCENT_COLOR));
-    values_grid->addWidget(arm_angle_value_, 0, 1);
+    // GRÁFICA 2: Error (Referencia - Real) (-45 a 45 grados)
+    ChartBase::ChartConfig error_config;
+    error_config.title = "TRACKING ERROR (Ref - Real)";
+    error_config.y_label = "Error";
+    error_config.units = "degrees";
+    error_config.primary_color = QColor(255, 100, 100); // Rojo para error
+    error_config.secondary_color = QColor(255, 150, 150);
+    error_config.sim_color = QColor(200, 200, 200);
+    error_config.y_min = -45.0;
+    error_config.y_max = 45.0;
+    error_config.auto_scale = false;
+    error_config.show_grid = true;
+    error_config.time_window_sec = 30.0;
+    error_config.max_points = 800;
+    error_config.show_milliseconds = false;
+    error_config.use_smooth_curves = true;
+    error_config.show_minor_grid = true;
 
-    angle_progress_ = new QProgressBar();
-    angle_progress_->setRange(-90, 90);
-    angle_progress_->setValue(0);
-    angle_progress_->setFormat("%v°");
-    values_grid->addWidget(angle_progress_, 0, 2);
+    error_chart_ = new ChartBase(error_config);
+    error_chart_->setMinimumHeight(200);
 
-    // Motor Speed
-    values_grid->addWidget(new QLabel("Motor Speed:"), 1, 0);
-    motor_speed_value_ = new QLabel("0.0 rad/s");
-    motor_speed_value_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14pt;").arg(SUCCESS_COLOR));
-    values_grid->addWidget(motor_speed_value_, 1, 1);
+    // GRÁFICA 3: Velocidad del Motor (0 a 1600 rad/s)
+    ChartBase::ChartConfig velocity_config;
+    velocity_config.title = "MOTOR VELOCITY";
+    velocity_config.y_label = "Velocity";
+    velocity_config.units = "rad/s";
+    velocity_config.primary_color = QColor(100, 255, 100); // Verde para velocidad
+    velocity_config.secondary_color = QColor(150, 255, 150);
+    velocity_config.sim_color = QColor(200, 200, 200);
+    velocity_config.y_min = 0.0;
+    velocity_config.y_max = 1600.0;
+    velocity_config.auto_scale = false;
+    velocity_config.show_grid = true;
+    velocity_config.time_window_sec = 30.0;
+    velocity_config.max_points = 800;
+    velocity_config.show_milliseconds = false;
+    velocity_config.use_smooth_curves = true;
+    velocity_config.show_minor_grid = true;
 
-    velocity_progress_ = new QProgressBar();
-    velocity_progress_->setRange(-785, 785);
-    velocity_progress_->setValue(0);
-    velocity_progress_->setFormat("%v rad/s");
-    values_grid->addWidget(velocity_progress_, 1, 2);
-
-    // PWM Input
-    values_grid->addWidget(new QLabel("PWM Input:"), 2, 0);
-    pwm_input_value_ = new QLabel("0 µs");
-    pwm_input_value_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14pt;").arg(WARNING_COLOR));
-    values_grid->addWidget(pwm_input_value_, 2, 1);
-
-    // Duty Cycle
-    values_grid->addWidget(new QLabel("Duty Cycle:"), 3, 0);
-    duty_cycle_value_ = new QLabel("0.00 %");
-    duty_cycle_value_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14pt;").arg(ACCENT_COLOR));
-    values_grid->addWidget(duty_cycle_value_, 3, 1);
-
-    // Control Error
-    values_grid->addWidget(new QLabel("Control Error:"), 4, 0);
-    error_value_ = new QLabel("0.0 °");
-    error_value_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14pt;").arg(TEXT_COLOR));
-    values_grid->addWidget(error_value_, 4, 1);
-
-    // Motor Command
-    values_grid->addWidget(new QLabel("Motor Command:"), 5, 0);
-    motor_cmd_value_ = new QLabel("0.0 rad/s");
-    motor_cmd_value_->setStyleSheet(QString("color: %1; font-weight: bold; font-size: 14pt;").arg(TEXT_COLOR));
-    values_grid->addWidget(motor_cmd_value_, 5, 1);
-
-    monitor_layout->addLayout(values_grid);
-    monitor_layout->addStretch();
+    motor_velocity_chart_ = new ChartBase(velocity_config);
+    motor_velocity_chart_->setMinimumHeight(200);
 }
 
 void MainWindow::createStatusBar()
@@ -391,6 +474,9 @@ void MainWindow::setupStyles()
             background-color: %4;
             color: %3;
         }
+        QCheckBox {
+            color: %3;
+        }
     )")
                              .arg(BACKGROUND_COLOR)
                              .arg(CARD_COLOR)
@@ -412,32 +498,43 @@ void MainWindow::updateDisplays()
     if (!data.valid)
         return;
 
-    // Update values (show REAL data in UI)
-    arm_angle_value_->setText(QString::number(data.arm_angle_deg, 'f', 2) + " °");
-    motor_speed_value_->setText(QString::number(data.motor_speed_rad_s, 'f', 2) + " rad/s");
-    pwm_input_value_->setText(QString::number(data.pwm_input_us, 'f', 0) + " µs");
-    duty_cycle_value_->setText(QString::number(data.duty_cycle_percent, 'f', 2) + " %");
-    error_value_->setText(QString::number(data.error, 'f', 2) + " °");
-    motor_cmd_value_->setText(QString::number(data.motor_command, 'f', 2) + " rad/s");
-
-    // Update progress bars
-    angle_progress_->setValue(static_cast<int>(data.arm_angle_deg));
-    velocity_progress_->setValue(static_cast<int>(data.motor_speed_rad_s));
-
-    // Update control mode
     control_mode_->setText("Mode: " + QString::fromStdString(ros_node_->getControlMode()));
 
-    // Update visualizer with BOTH real and simulation data
+    // Actualizar la visualización en tiempo real (pestaña 2)
     if (data_visualizer_)
     {
         data_visualizer_->onDataReceived(
             data.arm_angle_deg,
             data.motor_speed_rad_s,
             data.pwm_input_us,
-            data.sim_arm_angle_deg,     // NEW: simulation data
-            data.sim_motor_speed_rad_s, // NEW: simulation data
-            data.sim_pwm_input_us       // NEW: simulation data
-        );
+            data.sim_arm_angle_deg,
+            data.sim_motor_speed_rad_s,
+            data.sim_pwm_input_us);
+    }
+
+    // CRÍTICO: Actualizar las tres gráficas de la ventana de control
+    // con llamadas directas a addDataPoint y addSimDataPoint
+    if (angle_vs_reference_chart_)
+    {
+        // Serie principal (Real Data): Ángulo real - AZUL SÓLIDO
+        angle_vs_reference_chart_->addDataPoint(data.arm_angle_deg, data.system_timestamp);
+        // Serie de simulación (Simulation Data): Ángulo de referencia - NARANJA PUNTEADO
+        angle_vs_reference_chart_->addSimDataPoint(data.ref_angle_deg, data.system_timestamp);
+    }
+
+    if (error_chart_)
+    {
+        // Calcular el error: Referencia - Real
+        double error = data.ref_angle_deg - data.arm_angle_deg;
+        error_chart_->addDataPoint(error, data.system_timestamp);
+        // No se necesita serie de simulación para el error
+    }
+
+    if (motor_velocity_chart_)
+    {
+        // Velocidad del motor en rad/s
+        motor_velocity_chart_->addDataPoint(data.motor_speed_rad_s, data.system_timestamp);
+        // No se necesita serie de simulación para velocidad
     }
 }
 
@@ -445,20 +542,37 @@ void MainWindow::onAngleSliderChanged(int value)
 {
     angle_spinbox_->setValue(static_cast<double>(value));
 
-    if (ros_node_)
+    if (ros_node_ && !auto_mode_checkbox_->isChecked())
     {
-        ros_node_->sendAngleCommand(static_cast<double>(value));
+        double angle_rad = static_cast<double>(value) * M_PI / 180.0;
+        ros_node_->sendAngleCommand(angle_rad);
     }
 }
 
-void MainWindow::onVelocitySliderChanged(int value)
+void MainWindow::onPWMSliderChanged(int value)
 {
-    velocity_spinbox_->setValue(static_cast<double>(value));
+    pwm_spinbox_->setValue(value);
 
+    if (ros_node_ && !auto_mode_checkbox_->isChecked())
+    {
+        ros_node_->sendPWMCommand(static_cast<uint16_t>(value));
+    }
+}
+
+void MainWindow::onAutoModeToggled(bool checked)
+{
     if (ros_node_)
     {
-        ros_node_->sendVelocityCommand(static_cast<double>(value));
+        ros_node_->sendAutoModeCommand(checked);
     }
+
+    angle_slider_->setEnabled(!checked);
+    pwm_slider_->setEnabled(!checked);
+    angle_spinbox_->setEnabled(!checked);
+    pwm_spinbox_->setEnabled(!checked);
+
+    system_status_->setText(checked ? "System: Automatic Mode" : "System: Manual Mode");
+    system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(checked ? SUCCESS_COLOR : WARNING_COLOR));
 }
 
 void MainWindow::onStopClicked()
@@ -466,10 +580,13 @@ void MainWindow::onStopClicked()
     if (ros_node_)
     {
         ros_node_->sendStopCommand();
+        ros_node_->stopStepTest();
     }
 
     angle_slider_->setValue(0);
-    velocity_slider_->setValue(0);
+    pwm_slider_->setValue(1000);
+    stop_step_test_btn_->setEnabled(false);
+    start_step_test_btn_->setEnabled(true);
 
     system_status_->setText("System: STOPPED");
     system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(DANGER_COLOR));
@@ -481,9 +598,10 @@ void MainWindow::onStabilizeClicked()
     {
         PropArmData data = ros_node_->getCurrentData();
         double current_angle = data.arm_angle_deg;
+        double current_angle_rad = current_angle * M_PI / 180.0;
 
         angle_slider_->setValue(static_cast<int>(current_angle));
-        ros_node_->sendAngleCommand(current_angle);
+        ros_node_->sendAngleCommand(current_angle_rad);
     }
 
     system_status_->setText("System: Stabilizing");
@@ -495,6 +613,21 @@ void MainWindow::onRefreshClicked()
     if (data_visualizer_)
     {
         data_visualizer_->clearData();
+    }
+
+    if (angle_vs_reference_chart_)
+    {
+        angle_vs_reference_chart_->clearData();
+    }
+
+    if (error_chart_)
+    {
+        error_chart_->clearData();
+    }
+
+    if (motor_velocity_chart_)
+    {
+        motor_velocity_chart_->clearData();
     }
 
     system_status_->setText("System: Refreshed");
@@ -584,14 +717,14 @@ void MainWindow::onRecordingProgress(double remaining_time, size_t point_count)
     recording_progress_bar_->setValue(static_cast<int>(remaining_time));
 
     recording_status_label_->setText(
-        QString("Recording... %1 points captured")
+        QString("Recording... %1 pts")
             .arg(point_count));
 }
 
 void MainWindow::onRecordingCompleted(size_t point_count, double duration)
 {
     recording_status_label_->setText(
-        QString("Recording Complete: %1 points in %2 seconds")
+        QString("Complete: %1 pts (%2s)")
             .arg(point_count)
             .arg(duration, 0, 'f', 1));
     recording_status_label_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
@@ -609,10 +742,43 @@ void MainWindow::onRecordingCompleted(size_t point_count, double duration)
     {
         QMessageBox::information(this, "Recording Complete",
                                  QString("Successfully recorded %1 data points over %2 seconds.\n\n"
-                                         "Click 'EXPORT RECORDED DATA' to save to CSV.")
+                                         "Click 'EXPORT' to save to CSV.")
                                      .arg(point_count)
                                      .arg(duration, 0, 'f', 1));
     }
+}
+
+void MainWindow::onStartStepTestClicked()
+{
+    if (!ros_node_)
+        return;
+
+    double angle_low = step_angle_low_spinbox_->value();
+    double angle_high = step_angle_high_spinbox_->value();
+    double time_up = step_time_up_spinbox_->value();
+    double time_down = step_time_down_spinbox_->value();
+
+    ros_node_->startStepTest(angle_low, angle_high, time_up, time_down);
+
+    start_step_test_btn_->setEnabled(false);
+    stop_step_test_btn_->setEnabled(true);
+
+    system_status_->setText("System: Step Test Running");
+    system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
+}
+
+void MainWindow::onStopStepTestClicked()
+{
+    if (!ros_node_)
+        return;
+
+    ros_node_->stopStepTest();
+
+    start_step_test_btn_->setEnabled(true);
+    stop_step_test_btn_->setEnabled(false);
+
+    system_status_->setText("System: Step Test Stopped");
+    system_status_->setStyleSheet(QString("color: %1; font-weight: bold;").arg(WARNING_COLOR));
 }
 
 int main(int argc, char **argv)

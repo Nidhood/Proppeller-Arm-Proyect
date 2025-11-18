@@ -95,13 +95,13 @@ def generate_launch_description():
         ),
         
         # 6. Load PID controller node:
-        TimerAction(
-            period=20.0,
-            actions=[ IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(pid_controller_launch),
-                launch_arguments={'use_sim_time': use_sim_time}.items()
-            ) ]
-        ),
+        # TimerAction(
+        #     period=20.0,
+        #     actions=[ IncludeLaunchDescription(
+        #         PythonLaunchDescriptionSource(pid_controller_launch),
+        #         launch_arguments={'use_sim_time': use_sim_time}.items()
+        #     ) ]
+        # ),
 
         # 7. Launch PropArm GUI with fixed delay:
         # TimerAction(

@@ -125,11 +125,6 @@ void PidControllerNode::refCallback(const std_msgs::msg::Float64::SharedPtr msg)
         ref_deg = 90.0;
 
     ref_deg_ = ref_deg;
-
-    RCLCPP_INFO_THROTTLE(
-        get_logger(), *get_clock(), 2000,
-        "Reference updated from topic: ref_deg=%.2f (ref_rad=%.3f)",
-        ref_deg_, ref_rad);
 }
 
 // Gravity feedforward based on reference angle (degrees).
@@ -197,12 +192,6 @@ void PidControllerNode::controlLoop()
 
     // 7) Prepare for next step
     u_pid_[1] = u_pid_[0];
-
-    // Debug (throttled)
-    RCLCPP_INFO_THROTTLE(
-        get_logger(), *get_clock(), 500,
-        "ref=%.2f deg, angle=%.2f deg, e=%.2f, u_ff=%.1f, u_pid=%.1f, u_cmd=%.1f us",
-        ref_deg_, last_angle_deg_, e_[0], u_ff, u_pid_[0], u_cmd);
 }
 
 int main(int argc, char **argv)

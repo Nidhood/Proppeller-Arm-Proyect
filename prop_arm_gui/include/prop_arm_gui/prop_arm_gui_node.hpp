@@ -2,8 +2,8 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
-#include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/u_int16.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <QObject>
 #include <QTimer>
 #include <QDateTime>
@@ -19,15 +19,14 @@ struct PropArmData
     double motor_speed_rad_s = 0.0;
     double pwm_input_us = 0.0;
     double duty_cycle_percent = 0.0;
-    double motor_command = 0.0;
+    double ref_angle_deg = 0.0;
     double error = 0.0;
-    double target_angle = 0.0;
 
-    // NUEVO: Datos de simulación
     double sim_arm_angle_deg = 0.0;
     double sim_motor_speed_rad_s = 0.0;
     double sim_pwm_input_us = 0.0;
     double sim_duty_cycle_percent = 0.0;
+    double sim_ref_angle_deg = 0.0;
 
     double system_timestamp = 0.0;
     QDateTime datetime;
@@ -48,8 +47,9 @@ public:
     PropArmData getCurrentData() const;
     std::vector<PropArmData> getHistoryData(size_t max_points = 1000) const;
 
-    void sendAngleCommand(double angle_degrees);
-    void sendVelocityCommand(double velocity_rad_s);
+    void sendAngleCommand(double angle_rad);
+    void sendPWMCommand(uint16_t pwm_us);
+    void sendAutoModeCommand(bool auto_mode);
     void sendStopCommand();
 
     bool isConnected() const;
@@ -65,6 +65,10 @@ public:
     double getRecordingDuration() const;
     double getRecordingRemainingTime() const;
 
+    void startStepTest(double angle_low_deg, double angle_high_deg, double time_up_s, double time_down_s);
+    void stopStepTest();
+    bool isStepTestRunning() const { return step_test_active_; }
+
 signals:
     void dataUpdated();
     void connectionChanged(bool connected);
@@ -79,29 +83,27 @@ private:
     void updateConnectionStatus();
     double getSystemTimestamp() const;
     double calculateDutyCycle(double pwm_us) const;
+    void stepTestTimerCallback();
 
-    // Callbacks para datos reales
     void armAngleCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void motorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void pwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg);
-
-    // NUEVO: Callbacks para datos de simulación
     void simArmAngleCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void simMotorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void simPwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg);
+    void simRefAngleCallback(const std_msgs::msg::Float64::SharedPtr msg);
 
-    // Publishers
-    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr velocity_cmd_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr ref_angle_pub_;
+    rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr pwm_cmd_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr auto_mode_pub_;
 
-    // Subscribers reales
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr arm_angle_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr motor_speed_sub_;
     rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr pwm_input_sub_;
-
-    // NUEVO: Subscribers simulados
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sim_arm_angle_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sim_motor_speed_sub_;
     rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr sim_pwm_input_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sim_ref_angle_sub_;
 
     mutable std::mutex data_mutex_;
     PropArmData current_data_;
@@ -118,15 +120,14 @@ private:
     std::string control_mode_ = "Manual";
     static constexpr double CONNECTION_TIMEOUT = 2.0;
 
-    double target_angle_deg_ = 0.0;
-    double max_angle_deg_ = 90.0;
-    double min_angle_deg_ = -90.0;
-    double max_velocity_rad_s_ = 785.0;
-
-    double last_velocity_cmd_ = std::numeric_limits<double>::quiet_NaN();
-    rclcpp::Time last_velocity_pub_time_;
-    static constexpr double VELOCITY_CMD_MIN_DELTA = 0.5;
-    static constexpr double VELOCITY_CMD_DEBOUNCE_S = 0.08;
+    bool step_test_active_ = false;
+    double step_angle_low_deg_ = 0.0;
+    double step_angle_high_deg_ = 45.0;
+    double step_time_up_s_ = 5.0;
+    double step_time_down_s_ = 5.0;
+    bool step_high_phase_ = false;
+    rclcpp::Time step_phase_start_;
+    rclcpp::TimerBase::SharedPtr step_timer_;
 
     static constexpr double PWM_PERIOD_US = 20000.0;
 };

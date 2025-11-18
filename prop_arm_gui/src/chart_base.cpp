@@ -231,7 +231,7 @@ void ChartBase::setupSeries()
         smooth_series_->setColor(config_.primary_color);
 
         QPen pen(config_.primary_color);
-        pen.setWidth(2);
+        pen.setWidth(3); // ✅ CAMBIADO: de 2 a 3
         pen.setStyle(Qt::SolidLine);
         smooth_series_->setPen(pen);
 
@@ -246,7 +246,7 @@ void ChartBase::setupSeries()
         main_series_->setColor(config_.primary_color);
 
         QPen pen(config_.primary_color);
-        pen.setWidth(2);
+        pen.setWidth(3); // ✅ CAMBIADO: de 2 a 3
         pen.setStyle(Qt::SolidLine);
         main_series_->setPen(pen);
 
@@ -263,7 +263,7 @@ void ChartBase::setupSeries()
         sim_smooth_series_->setColor(config_.sim_color);
 
         QPen sim_pen(config_.sim_color);
-        sim_pen.setWidth(2);
+        sim_pen.setWidth(3); // ✅ CAMBIADO: de 2 a 3
         sim_pen.setStyle(Qt::DashLine);
         sim_smooth_series_->setPen(sim_pen);
 
@@ -278,7 +278,7 @@ void ChartBase::setupSeries()
         sim_main_series_->setColor(config_.sim_color);
 
         QPen sim_pen(config_.sim_color);
-        sim_pen.setWidth(2);
+        sim_pen.setWidth(3); // ✅ CAMBIADO: de 2 a 3
         sim_pen.setStyle(Qt::DashLine);
         sim_main_series_->setPen(sim_pen);
 
@@ -394,15 +394,6 @@ void ChartBase::initializeWithZeroData()
     double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     start_time_ = current_time;
 
-    int num_initial_points = static_cast<int>(config_.time_window_sec * 10);
-    for (int i = 0; i < num_initial_points; ++i)
-    {
-        double timestamp = start_time_ + (i * config_.time_window_sec) / num_initial_points;
-        double initial_value = 0.0;
-        data_points_.push_back(DataPoint(timestamp, initial_value));
-        sim_data_points_.push_back(DataPoint(timestamp, initial_value));
-    }
-
     data_initialized_ = true;
     update_pending_ = true;
 }
@@ -438,7 +429,7 @@ void ChartBase::addDataPoint(double value, double timestamp)
         data_points_.pop_front();
     }
 
-    update_pending_ = true;
+    update_pending_ = true; // ✅ CRÍTICO: Activa la actualización
 }
 
 void ChartBase::addSimDataPoint(double value, double timestamp)
@@ -472,12 +463,12 @@ void ChartBase::addSimDataPoint(double value, double timestamp)
         sim_data_points_.pop_front();
     }
 
-    update_pending_ = true;
+    update_pending_ = true; // ✅ CRÍTICO: Activa la actualización
 }
 
 void ChartBase::updateSeriesOptimized()
 {
-    // CRITICAL FIX: Update REAL data series
+    // Update REAL data series
     series_points_buffer_.clear();
     for (const auto &point : data_points_)
     {
@@ -485,16 +476,28 @@ void ChartBase::updateSeriesOptimized()
         series_points_buffer_.append(QPointF(relative_time, point.value));
     }
 
+    // ✅ AGREGADO: Validación para series con 1 punto
     if (config_.use_smooth_curves && smooth_series_)
     {
-        updateSplineSeries();
+        if (series_points_buffer_.size() > 1)
+        {
+            updateSplineSeries();
+        }
+        else if (series_points_buffer_.size() == 1)
+        {
+            // Con 1 solo punto, mostrar directamente
+            smooth_series_->replace(series_points_buffer_);
+        }
     }
     else if (main_series_)
     {
-        main_series_->replace(series_points_buffer_);
+        if (!series_points_buffer_.isEmpty())
+        {
+            main_series_->replace(series_points_buffer_);
+        }
     }
 
-    // CRITICAL FIX: ALWAYS update SIMULATION data series
+    // Update SIMULATION data series
     updateSimSeries();
 }
 
@@ -503,7 +506,8 @@ void ChartBase::updateSplineSeries()
     if (!smooth_series_ || series_points_buffer_.isEmpty())
         return;
 
-    if (series_points_buffer_.size() <= 10)
+    // ✅ CAMBIADO: de 10 a 3 puntos como umbral
+    if (series_points_buffer_.size() <= 3)
     {
         smooth_series_->replace(series_points_buffer_);
         return;
@@ -540,33 +544,46 @@ void ChartBase::updateSimSeries()
 
     if (config_.use_smooth_curves && sim_smooth_series_)
     {
-        if (sim_series_points_buffer_.size() <= 10)
+        // ✅ AGREGADO: Validación para 1 punto
+        if (sim_series_points_buffer_.size() > 1)
         {
+            // ✅ CAMBIADO: de 10 a 3 puntos como umbral
+            if (sim_series_points_buffer_.size() <= 3)
+            {
+                sim_smooth_series_->replace(sim_series_points_buffer_);
+                return;
+            }
+
+            std::vector<QPointF> control_points;
+            control_points.reserve(sim_series_points_buffer_.size());
+
+            for (const auto &point : sim_series_points_buffer_)
+            {
+                control_points.push_back(point);
+            }
+
+            auto spline_points = calculateSplinePoints(control_points);
+
+            sim_spline_points_buffer_.clear();
+            for (const auto &point : spline_points)
+            {
+                sim_spline_points_buffer_.append(point);
+            }
+
+            sim_smooth_series_->replace(sim_spline_points_buffer_);
+        }
+        else if (sim_series_points_buffer_.size() == 1)
+        {
+            // Con 1 solo punto, mostrar directamente
             sim_smooth_series_->replace(sim_series_points_buffer_);
-            return;
         }
-
-        std::vector<QPointF> control_points;
-        control_points.reserve(sim_series_points_buffer_.size());
-
-        for (const auto &point : sim_series_points_buffer_)
-        {
-            control_points.push_back(point);
-        }
-
-        auto spline_points = calculateSplinePoints(control_points);
-
-        sim_spline_points_buffer_.clear();
-        for (const auto &point : spline_points)
-        {
-            sim_spline_points_buffer_.append(point);
-        }
-
-        sim_smooth_series_->replace(sim_spline_points_buffer_);
     }
     else if (sim_main_series_)
     {
-        sim_main_series_->replace(sim_series_points_buffer_);
+        if (!sim_series_points_buffer_.isEmpty())
+        {
+            sim_main_series_->replace(sim_series_points_buffer_);
+        }
     }
 }
 
@@ -613,7 +630,7 @@ void ChartBase::performUpdate()
     if (update_pending_)
     {
         QMutexLocker locker(data_mutex_);
-        updateSeriesOptimized();
+        updateSeriesOptimized(); // ✅ LLAMA A LAS FUNCIONES CORREGIDAS
         updateAxes();
         update_pending_ = false;
         emit dataUpdated();

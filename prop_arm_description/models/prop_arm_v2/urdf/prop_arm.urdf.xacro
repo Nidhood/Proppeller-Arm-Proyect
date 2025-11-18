@@ -77,7 +77,7 @@
   <joint name="arm_link_joint" type="revolute">
     <axis xyz="0 1 0"/>
     <origin rpy="0 -1.57080 -1.57080" xyz="0.00001 -0.00000 0.45833"/>
-    <limit lower="0.1421" upper="3.1416" effort="1500.0" velocity="10.0"/>
+    <limit lower="0.16643634279943126" upper="3.1416" effort="1500.0" velocity="10.0"/>
     <dynamics damping="0.0" friction="0.0"/>
     <parent link="base_link"/>
     <child link="arm_link"/>

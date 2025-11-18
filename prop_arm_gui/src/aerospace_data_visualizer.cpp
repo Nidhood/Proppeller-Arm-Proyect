@@ -173,7 +173,7 @@ void AerospaceDataVisualizer::setupUI()
         {"ARM ANGLE vs TIME",
          "Angle", "degrees",
          QColor(100, 200, 255), QColor(150, 220, 255), QColor(255, 150, 100), // sim_color naranja
-         0.0, 180.0, false,
+         0.0, 100.0, false,
          "arm_angle",
          [](const TelemetryData &data)
          { return data.arm_angle; },
@@ -183,7 +183,7 @@ void AerospaceDataVisualizer::setupUI()
         {"MOTOR VELOCITY vs TIME",
          "Velocity", "rad/s",
          QColor(100, 255, 100), QColor(150, 255, 150), QColor(255, 200, 100), // sim_color amarillo
-         -800.0, 800.0, false,
+         0.0, 1600.0, false,
          "motor_velocity",
          [](const TelemetryData &data)
          { return data.motor_speed; },
@@ -193,7 +193,7 @@ void AerospaceDataVisualizer::setupUI()
         {"PWM INPUT vs TIME",
          "PWM", "µs",
          QColor(255, 120, 200), QColor(255, 170, 220), QColor(200, 100, 255), // sim_color púrpura
-         1000, 2000, true,
+         1000, 2000, false,
          "pwm_input",
          [](const TelemetryData &data)
          { return data.pwm_input_us; },
@@ -203,7 +203,7 @@ void AerospaceDataVisualizer::setupUI()
         {"DUTY CYCLE vs TIME",
          "Duty", "%",
          QColor(255, 255, 0), QColor(255, 255, 100), QColor(100, 255, 255), // sim_color cyan
-         0, 15, true,
+         5, 10, false,
          "duty_cycle",
          [](const TelemetryData &data)
          { return data.duty_cycle_percent; },

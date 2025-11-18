@@ -1,7 +1,7 @@
 prop_arm_pid_controller:
   ros__parameters:
     Ts: 0.01
-    ref_deg: 60.0
+    ref_deg: 0.0
     pwm_min: 1000.0
     pwm_max: 2000.0
     pwm_idle_us: 1182.0
