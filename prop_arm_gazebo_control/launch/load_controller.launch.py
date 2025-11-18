@@ -14,10 +14,6 @@ import os
 def launch_setup(context, *args, **kwargs):
     use_sim_time = LaunchConfiguration('use_sim_time')
 
-    # Package share dir and PID config_
-    pkg_share = get_package_share_directory('prop_arm_gazebo_control')
-    pid_cfg = os.path.join(pkg_share, 'config', 'prop_arm_pid_controller.yaml')
-
     # Bridges first so /clock and motor speed are available:
     clock_bridge = Node(
         package='ros_gz_bridge',
@@ -46,20 +42,10 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
     )
 
-    # PID controller node:
-    pid_controller_node = Node(
-        package='prop_arm_gazebo_control',
-        executable='pid_controller_node',
-        name='prop_arm_pid_controller',
-        output='screen',
-        parameters=[pid_cfg, {'use_sim_time': use_sim_time}],
-    )
-
     return [
         clock_bridge,
         motor_speed_bridge,
         TimerAction(period=2.0, actions=[jsb_spawner]),
-        TimerAction(period=2.5, actions=[pid_controller_node]),
     ]
 
 

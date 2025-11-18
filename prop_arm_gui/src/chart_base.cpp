@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <cmath>
 
-// Define static color constants
 const QColor ChartBase::BACKGROUND_DARK = QColor(0, 0, 0);
 const QColor ChartBase::PLOT_BACKGROUND = QColor(20, 20, 20);
 const QColor ChartBase::GRID_PRIMARY = QColor(60, 60, 60);
@@ -24,7 +23,6 @@ const QColor ChartBase::ACCENT_BLUE = QColor(0, 150, 255);
 const QColor ChartBase::ACCENT_PURPLE = QColor(160, 0, 255);
 const QColor ChartBase::ACCENT_RED = QColor(255, 0, 0);
 
-// HoverChartView implementation
 HoverChartView::HoverChartView(QWidget *parent)
     : QChartView(parent),
       hover_enabled_(true),
@@ -113,11 +111,10 @@ void HoverChartView::clearHoverElements()
     }
 }
 
-// ChartBase implementation
 ChartBase::ChartBase(const ChartConfig &config, QWidget *parent)
     : QWidget(parent),
       config_(config),
-      start_time_(QDateTime::currentMSecsSinceEpoch() / 1000.0),
+      start_time_(-1.0),
       chart_(nullptr),
       chart_view_(nullptr),
       main_series_(nullptr),
@@ -149,12 +146,10 @@ ChartBase::ChartBase(const ChartConfig &config, QWidget *parent)
     setupSeries();
     setupAdvancedGrid();
     applyProfessionalTheme();
-    initializeWithZeroData();
 
-    // Setup update timer
     update_timer_ = new QTimer(this);
     update_timer_->setSingleShot(false);
-    update_timer_->setInterval(50); // 20 FPS
+    update_timer_->setInterval(50);
     connect(update_timer_, &QTimer::timeout, this, &ChartBase::performUpdate);
     update_timer_->start();
 }
@@ -223,7 +218,6 @@ void ChartBase::setupAxes()
 
 void ChartBase::setupSeries()
 {
-    // REAL DATA SERIES (primary - solid, thicker)
     if (config_.use_smooth_curves)
     {
         smooth_series_ = new QSplineSeries();
@@ -231,7 +225,7 @@ void ChartBase::setupSeries()
         smooth_series_->setColor(config_.primary_color);
 
         QPen pen(config_.primary_color);
-        pen.setWidth(2);
+        pen.setWidth(3);
         pen.setStyle(Qt::SolidLine);
         smooth_series_->setPen(pen);
 
@@ -246,7 +240,7 @@ void ChartBase::setupSeries()
         main_series_->setColor(config_.primary_color);
 
         QPen pen(config_.primary_color);
-        pen.setWidth(2);
+        pen.setWidth(3);
         pen.setStyle(Qt::SolidLine);
         main_series_->setPen(pen);
 
@@ -255,7 +249,6 @@ void ChartBase::setupSeries()
         main_series_->attachAxis(y_axis_);
     }
 
-    // SIMULATION DATA SERIES (secondary - dashed, thinner)
     if (config_.use_smooth_curves)
     {
         sim_smooth_series_ = new QSplineSeries();
@@ -263,7 +256,7 @@ void ChartBase::setupSeries()
         sim_smooth_series_->setColor(config_.sim_color);
 
         QPen sim_pen(config_.sim_color);
-        sim_pen.setWidth(2);
+        sim_pen.setWidth(3);
         sim_pen.setStyle(Qt::DashLine);
         sim_smooth_series_->setPen(sim_pen);
 
@@ -278,7 +271,7 @@ void ChartBase::setupSeries()
         sim_main_series_->setColor(config_.sim_color);
 
         QPen sim_pen(config_.sim_color);
-        sim_pen.setWidth(2);
+        sim_pen.setWidth(3);
         sim_pen.setStyle(Qt::DashLine);
         sim_main_series_->setPen(sim_pen);
 
@@ -287,7 +280,6 @@ void ChartBase::setupSeries()
         sim_main_series_->attachAxis(y_axis_);
     }
 
-    // Reserve buffers
     series_points_buffer_.reserve(config_.max_points);
     spline_points_buffer_.reserve(config_.max_points);
     sim_series_points_buffer_.reserve(config_.max_points);
@@ -328,29 +320,72 @@ void ChartBase::updateAxes()
     if (!x_axis_ || !y_axis_)
         return;
 
-    double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    double time_range = current_time - start_time_;
-
-    if (time_range > config_.time_window_sec)
+    if (start_time_ < 0.0 || data_points_.empty())
     {
-        x_axis_->setRange(time_range - config_.time_window_sec, time_range);
+        x_axis_->setRange(0, config_.time_window_sec);
+        if (!config_.auto_scale)
+        {
+            y_axis_->setRange(config_.y_min, config_.y_max);
+        }
+        return;
+    }
+
+    double last_data_time = data_points_.back().timestamp;
+    double time_elapsed = last_data_time - start_time_;
+
+    if (time_elapsed <= config_.time_window_sec)
+    {
+        x_axis_->setRange(0, config_.time_window_sec);
     }
     else
     {
-        x_axis_->setRange(0, config_.time_window_sec);
+        double window_end = time_elapsed;
+        double window_start = time_elapsed - config_.time_window_sec;
+        x_axis_->setRange(window_start, window_end);
     }
 
     if (config_.auto_scale && !data_points_.empty())
     {
-        auto [min_it, max_it] = std::minmax_element(
-            data_points_.begin(), data_points_.end(),
-            [](const DataPoint &a, const DataPoint &b)
+        double x_min = x_axis_->min();
+        double x_max = x_axis_->max();
+        
+        double min_value = std::numeric_limits<double>::max();
+        double max_value = std::numeric_limits<double>::lowest();
+        
+        bool found_data = false;
+        
+        for (const auto& point : data_points_)
+        {
+            double relative_time = point.timestamp - start_time_;
+            if (relative_time >= x_min && relative_time <= x_max)
             {
-                return a.value < b.value;
-            });
-
-        double margin = (max_it->value - min_it->value) * 0.1;
-        y_axis_->setRange(min_it->value - margin, max_it->value + margin);
+                min_value = std::min(min_value, point.value);
+                max_value = std::max(max_value, point.value);
+                found_data = true;
+            }
+        }
+        
+        for (const auto& point : sim_data_points_)
+        {
+            double relative_time = point.timestamp - start_time_;
+            if (relative_time >= x_min && relative_time <= x_max)
+            {
+                min_value = std::min(min_value, point.value);
+                max_value = std::max(max_value, point.value);
+                found_data = true;
+            }
+        }
+        
+        if (found_data && min_value != std::numeric_limits<double>::max())
+        {
+            double margin = (max_value - min_value) * 0.1;
+            if (margin < 0.01) margin = 1.0;
+            y_axis_->setRange(min_value - margin, max_value + margin);
+        }
+    }
+    else if (!config_.auto_scale)
+    {
+        y_axis_->setRange(config_.y_min, config_.y_max);
     }
 }
 
@@ -383,57 +418,32 @@ void ChartBase::initializeWithOptimizedData()
 
 void ChartBase::initializeWithZeroData()
 {
-    if (data_initialized_)
-        return;
-
-    QMutexLocker locker(data_mutex_);
-
-    data_points_.clear();
-    sim_data_points_.clear();
-
-    double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    start_time_ = current_time;
-
-    int num_initial_points = static_cast<int>(config_.time_window_sec * 10);
-    for (int i = 0; i < num_initial_points; ++i)
-    {
-        double timestamp = start_time_ + (i * config_.time_window_sec) / num_initial_points;
-        double initial_value = 0.0;
-        data_points_.push_back(DataPoint(timestamp, initial_value));
-        sim_data_points_.push_back(DataPoint(timestamp, initial_value));
-    }
-
-    data_initialized_ = true;
-    update_pending_ = true;
 }
 
 void ChartBase::addDataPoint(double value, double timestamp)
 {
     QMutexLocker locker(data_mutex_);
 
-    if (timestamp < 0)
+    if (timestamp < 0.0)
     {
         timestamp = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     }
 
-    DataPoint point(timestamp, value);
-
-    if (!data_initialized_)
+    if (start_time_ < 0.0)
     {
-        initializeWithZeroData();
+        start_time_ = timestamp;
+        data_initialized_ = true;
     }
 
-    data_points_.push_back(point);
+    data_points_.push_back(DataPoint(timestamp, value));
 
-    double current_time = timestamp;
-    double cutoff_time = current_time - config_.time_window_sec;
-
+    double cutoff_time = timestamp - (config_.time_window_sec * 2.0);
     while (!data_points_.empty() && data_points_.front().timestamp < cutoff_time)
     {
         data_points_.pop_front();
     }
 
-    while (data_points_.size() > config_.max_points)
+    while (data_points_.size() > config_.max_points * 2)
     {
         data_points_.pop_front();
     }
@@ -445,29 +455,26 @@ void ChartBase::addSimDataPoint(double value, double timestamp)
 {
     QMutexLocker locker(data_mutex_);
 
-    if (timestamp < 0)
+    if (timestamp < 0.0)
     {
         timestamp = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     }
 
-    DataPoint point(timestamp, value);
-
-    if (!data_initialized_)
+    if (start_time_ < 0.0)
     {
-        initializeWithZeroData();
+        start_time_ = timestamp;
+        data_initialized_ = true;
     }
 
-    sim_data_points_.push_back(point);
+    sim_data_points_.push_back(DataPoint(timestamp, value));
 
-    double current_time = timestamp;
-    double cutoff_time = current_time - config_.time_window_sec;
-
+    double cutoff_time = timestamp - (config_.time_window_sec * 2.0);
     while (!sim_data_points_.empty() && sim_data_points_.front().timestamp < cutoff_time)
     {
         sim_data_points_.pop_front();
     }
 
-    while (sim_data_points_.size() > config_.max_points)
+    while (sim_data_points_.size() > config_.max_points * 2)
     {
         sim_data_points_.pop_front();
     }
@@ -477,60 +484,62 @@ void ChartBase::addSimDataPoint(double value, double timestamp)
 
 void ChartBase::updateSeriesOptimized()
 {
-    // CRITICAL FIX: Update REAL data series
     series_points_buffer_.clear();
-    for (const auto &point : data_points_)
+
+    if (data_points_.empty())
     {
-        double relative_time = point.timestamp - start_time_;
-        series_points_buffer_.append(QPointF(relative_time, point.value));
+        if (smooth_series_)
+            smooth_series_->clear();
+        if (main_series_)
+            main_series_->clear();
+    }
+    else
+    {
+        for (const auto &point : data_points_)
+        {
+            double relative_time = point.timestamp - start_time_;
+            series_points_buffer_.append(QPointF(relative_time, point.value));
+        }
+
+        if (config_.use_smooth_curves && smooth_series_)
+        {
+            smooth_series_->replace(series_points_buffer_);
+        }
+        else if (main_series_)
+        {
+            main_series_->replace(series_points_buffer_);
+        }
     }
 
-    if (config_.use_smooth_curves && smooth_series_)
-    {
-        updateSplineSeries();
-    }
-    else if (main_series_)
-    {
-        main_series_->replace(series_points_buffer_);
-    }
-
-    // CRITICAL FIX: ALWAYS update SIMULATION data series
     updateSimSeries();
 }
 
 void ChartBase::updateSplineSeries()
 {
     if (!smooth_series_ || series_points_buffer_.isEmpty())
+    {
+        if (smooth_series_)
+        {
+            smooth_series_->clear();
+        }
         return;
-
-    if (series_points_buffer_.size() <= 10)
-    {
-        smooth_series_->replace(series_points_buffer_);
-        return;
     }
 
-    std::vector<QPointF> control_points;
-    control_points.reserve(series_points_buffer_.size());
-
-    for (const auto &point : series_points_buffer_)
-    {
-        control_points.push_back(point);
-    }
-
-    auto spline_points = calculateSplinePoints(control_points);
-
-    spline_points_buffer_.clear();
-    for (const auto &point : spline_points)
-    {
-        spline_points_buffer_.append(point);
-    }
-
-    smooth_series_->replace(spline_points_buffer_);
+    smooth_series_->replace(series_points_buffer_);
 }
 
 void ChartBase::updateSimSeries()
 {
     sim_series_points_buffer_.clear();
+
+    if (sim_data_points_.empty())
+    {
+        if (sim_smooth_series_)
+            sim_smooth_series_->clear();
+        if (sim_main_series_)
+            sim_main_series_->clear();
+        return;
+    }
 
     for (const auto &point : sim_data_points_)
     {
@@ -540,29 +549,7 @@ void ChartBase::updateSimSeries()
 
     if (config_.use_smooth_curves && sim_smooth_series_)
     {
-        if (sim_series_points_buffer_.size() <= 10)
-        {
-            sim_smooth_series_->replace(sim_series_points_buffer_);
-            return;
-        }
-
-        std::vector<QPointF> control_points;
-        control_points.reserve(sim_series_points_buffer_.size());
-
-        for (const auto &point : sim_series_points_buffer_)
-        {
-            control_points.push_back(point);
-        }
-
-        auto spline_points = calculateSplinePoints(control_points);
-
-        sim_spline_points_buffer_.clear();
-        for (const auto &point : spline_points)
-        {
-            sim_spline_points_buffer_.append(point);
-        }
-
-        sim_smooth_series_->replace(sim_spline_points_buffer_);
+        sim_smooth_series_->replace(sim_series_points_buffer_);
     }
     else if (sim_main_series_)
     {
@@ -614,9 +601,13 @@ void ChartBase::performUpdate()
     {
         QMutexLocker locker(data_mutex_);
         updateSeriesOptimized();
-        updateAxes();
+        updateAxes(); 
         update_pending_ = false;
         emit dataUpdated();
+    }
+    else
+    {
+        updateAxes();
     }
 
     if (hover_persistent_ && hover_fixed_time_absolute_ > 0.0)
@@ -633,7 +624,14 @@ void ChartBase::onHoverUpdate(QPointF chart_position, QPoint scene_position, boo
 
     if (valid)
     {
-        hover_fixed_time_absolute_ = start_time_ + chart_position.x();
+        if (start_time_ > 0.0)
+        {
+            hover_fixed_time_absolute_ = start_time_ + chart_position.x();
+        }
+        else
+        {
+            hover_fixed_time_absolute_ = chart_position.x();
+        }
         hover_persistent_ = true;
         hover_fixed_scene_x_ = scene_position.x();
         updateHoverDisplay();
@@ -652,27 +650,15 @@ void ChartBase::updateHoverDisplay()
     if (!chart_view_ || !chart_view_->scene())
         return;
 
-    if (hover_fixed_time_absolute_ <= 0.0)
+    if (hover_fixed_time_absolute_ <= 0.0 || start_time_ < 0.0)
         return;
 
     QPointF chart_at_x = sceneToChartCoords(QPoint(hover_fixed_scene_x_, current_scene_pos_.y()));
     double current_relative_time = chart_at_x.x();
     hover_fixed_time_absolute_ = start_time_ + current_relative_time;
 
-    double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    double time_range = current_time - start_time_;
-
-    double x_min, x_max;
-    if (time_range > config_.time_window_sec)
-    {
-        x_min = time_range - config_.time_window_sec;
-        x_max = time_range;
-    }
-    else
-    {
-        x_min = 0;
-        x_max = config_.time_window_sec;
-    }
+    double x_min = x_axis_->min();
+    double x_max = x_axis_->max();
 
     if (current_relative_time < x_min || current_relative_time > x_max)
     {
@@ -763,22 +749,40 @@ void ChartBase::createHoverElements(QGraphicsScene *scene, const QPointF &,
 
 QPointF ChartBase::findNearestPointOnCurve(double absolute_target_time) const
 {
-    if (data_points_.empty())
+    if (data_points_.empty() && sim_data_points_.empty())
+    {
         return QPointF(0, (config_.y_min + config_.y_max) / 2.0);
+    }
 
-    auto it = std::lower_bound(data_points_.begin(), data_points_.end(), absolute_target_time,
+    const std::deque<DataPoint>* best_deque = nullptr;
+    
+    if (!data_points_.empty())
+    {
+        best_deque = &data_points_;
+    }
+    else if (!sim_data_points_.empty())
+    {
+        best_deque = &sim_data_points_;
+    }
+    
+    if (!best_deque || best_deque->empty())
+    {
+        return QPointF(0, (config_.y_min + config_.y_max) / 2.0);
+    }
+
+    auto it = std::lower_bound(best_deque->begin(), best_deque->end(), absolute_target_time,
                                [](const DataPoint &point, double time)
                                {
                                    return point.timestamp < time;
                                });
 
-    if (it == data_points_.begin())
+    if (it == best_deque->begin())
     {
         return QPointF(it->timestamp - start_time_, it->value);
     }
-    if (it == data_points_.end())
+    if (it == best_deque->end())
     {
-        return QPointF(data_points_.back().timestamp - start_time_, data_points_.back().value);
+        return QPointF(best_deque->back().timestamp - start_time_, best_deque->back().value);
     }
 
     auto prev_it = it - 1;
@@ -802,22 +806,24 @@ double ChartBase::findValueAtScenePosition(const QPoint &scene_pos)
 
 double ChartBase::interpolateValue(double target_time) const
 {
-    if (data_points_.empty())
+    if (data_points_.empty() && sim_data_points_.empty())
         return 0.0;
 
-    auto it = std::lower_bound(data_points_.begin(), data_points_.end(), target_time,
+    const std::deque<DataPoint>* search_deque = data_points_.empty() ? &sim_data_points_ : &data_points_;
+
+    auto it = std::lower_bound(search_deque->begin(), search_deque->end(), target_time,
                                [this](const DataPoint &point, double time)
                                {
                                    return (point.timestamp - start_time_) < time;
                                });
 
-    if (it == data_points_.begin())
+    if (it == search_deque->begin())
     {
         return it->value;
     }
-    if (it == data_points_.end())
+    if (it == search_deque->end())
     {
-        return data_points_.back().value;
+        return search_deque->back().value;
     }
 
     auto prev_it = it - 1;
@@ -850,48 +856,40 @@ QPoint ChartBase::chartToSceneCoords(const QPointF &chart_pos) const
 void ChartBase::clearData()
 {
     QMutexLocker locker(data_mutex_);
+    
     data_points_.clear();
     sim_data_points_.clear();
-    start_time_ = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    
+    start_time_ = -1.0;
+    
     last_update_time_ = 0;
     last_hover_update_time_ = 0;
     update_pending_ = false;
     hover_update_pending_ = false;
     data_initialized_ = false;
 
-    if (hover_persistent_ && hover_fixed_time_absolute_ > 0.0)
-    {
-        cached_hover_value_ = 0.0;
-        cached_hover_time_ = -1.0;
-    }
-    else
-    {
-        hover_active_ = false;
-        hover_persistent_ = false;
-        hover_fixed_time_absolute_ = -1.0;
-        cached_hover_value_ = 0.0;
-        cached_hover_time_ = -1.0;
-    }
+    hover_active_ = false;
+    hover_persistent_ = false;
+    hover_fixed_time_absolute_ = -1.0;
+    cached_hover_value_ = 0.0;
+    cached_hover_time_ = -1.0;
 
     pool_write_index_ = 0;
 
-    initializeWithZeroData();
-    initializeWithOptimizedData();
-
     QMetaObject::invokeMethod(this, [this]()
-                              {
+    {
         if (main_series_) main_series_->clear();
         if (smooth_series_) smooth_series_->clear();
         if (sim_main_series_) sim_main_series_->clear();
         if (sim_smooth_series_) sim_smooth_series_->clear();
+        
         x_axis_->setRange(0, config_.time_window_sec);
         y_axis_->setRange(config_.y_min, config_.y_max);
         
-        if (!hover_persistent_) {
-            cleanupHoverElements();
-        }
+        cleanupHoverElements();
         
-        update_pending_ = true; }, Qt::QueuedConnection);
+        update_pending_ = true;
+    }, Qt::QueuedConnection);
 }
 
 void ChartBase::setTimeWindow(double seconds)
@@ -899,18 +897,12 @@ void ChartBase::setTimeWindow(double seconds)
     config_.time_window_sec = std::max(1.0, std::min(120.0, seconds));
 
     QMutexLocker locker(data_mutex_);
-    data_points_.clear();
-    sim_data_points_.clear();
-    data_initialized_ = false;
-    initializeMemoryPool();
-    initializeWithZeroData();
-    initializeWithOptimizedData();
     update_pending_ = true;
 }
 
-void ChartBase::setShowMilliseconds(bool /*show_ms*/)
+void ChartBase::setShowMilliseconds(bool show_ms)
 {
-    config_.show_milliseconds = false;
+    config_.show_milliseconds = show_ms;
     setupAxes();
     update_pending_ = true;
 }

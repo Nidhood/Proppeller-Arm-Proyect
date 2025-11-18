@@ -25,8 +25,8 @@ AerospaceDataVisualizer::AerospaceDataVisualizer(std::shared_ptr<rclcpp::Node> n
                 double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
                 if (current_time - last_update_time_ > 0.05)
                 {
-                    // Update logic si es necesario
-                } });
+                }
+            });
     update_timer_->start();
 
     setMinimumSize(1400, 600);
@@ -63,21 +63,9 @@ void AerospaceDataVisualizer::loadConfiguration()
             time_window_sec_ = ros_node_->get_parameter_or("visualization.time_window_sec", 30.0);
             max_points_ = ros_node_->get_parameter_or("visualization.max_plot_points", static_cast<int>(800));
             update_rate_ms_ = ros_node_->get_parameter_or("visualization.update_rate_ms", 50);
-
-            bool use_smooth_curves = ros_node_->get_parameter_or("visualization.use_smooth_curves", true);
-            bool show_minor_grid = ros_node_->get_parameter_or("visualization.show_minor_grid", true);
-
-            RCLCPP_INFO(ros_node_->get_logger(),
-                        "Loaded visualization config - Time window: %.1f s, Max points: %zu, "
-                        "Update rate: %d ms, Smooth curves: %s, Minor grid: %s",
-                        time_window_sec_, max_points_, update_rate_ms_,
-                        use_smooth_curves ? "enabled" : "disabled",
-                        show_minor_grid ? "enabled" : "disabled");
         }
         catch (const std::exception &e)
         {
-            RCLCPP_WARN(ros_node_->get_logger(),
-                        "Failed to load some visualization parameters: %s. Using defaults.", e.what());
             time_window_sec_ = 30.0;
             max_points_ = 800;
             update_rate_ms_ = 50;
@@ -119,16 +107,10 @@ ChartBase::ChartConfig AerospaceDataVisualizer::createChartConfig(
         {
             std::string base_key = "visualization.charts." + config_key.toStdString();
 
-            // NOTA: Para ángulo y velocidad, ignoramos auto_scale de parámetros
-            // y forzamos rangos fijos
-            if (config_key == "arm_angle" || config_key == "motor_velocity")
+            if (config_key == "arm_angle" || config_key == "motor_velocity" || 
+                config_key == "pwm_input" || config_key == "duty_cycle")
             {
                 config.auto_scale = false;
-                RCLCPP_INFO(ros_node_->get_logger(),
-                            "Chart '%s': Fixed range [%.1f, %.1f] %s",
-                            config_key.toStdString().c_str(),
-                            config.y_min, config.y_max,
-                            units.toStdString().c_str());
             }
             else
             {
@@ -152,9 +134,6 @@ ChartBase::ChartConfig AerospaceDataVisualizer::createChartConfig(
         }
         catch (const std::exception &e)
         {
-            RCLCPP_WARN(ros_node_->get_logger(),
-                        "Failed to load chart config for %s: %s. Using defaults.",
-                        config_key.toStdString().c_str(), e.what());
         }
     }
 
@@ -167,48 +146,38 @@ void AerospaceDataVisualizer::setupUI()
     main_layout_->setSpacing(8);
     main_layout_->setContentsMargins(12, 12, 12, 12);
 
-    // 4 GRÁFICAS: ARM ANGLE (0-180°), MOTOR VELOCITY (-800 a 800 rad/s), PWM INPUT (us), DUTY CYCLE (%)
-    // Con extractores tanto para datos reales como simulados
     chart_setups_ = {
         {"ARM ANGLE vs TIME",
          "Angle", "degrees",
-         QColor(100, 200, 255), QColor(150, 220, 255), QColor(255, 150, 100), // sim_color naranja
-         0.0, 180.0, false,
+         QColor(100, 200, 255), QColor(150, 220, 255), QColor(255, 150, 100),
+         0.0, 100.0, false,
          "arm_angle",
-         [](const TelemetryData &data)
-         { return data.arm_angle; },
-         [](const TelemetryData &data)
-         { return data.sim_arm_angle; }},
+         [](const TelemetryData &data) { return data.arm_angle; },
+         [](const TelemetryData &data) { return data.sim_arm_angle; }},
 
         {"MOTOR VELOCITY vs TIME",
          "Velocity", "rad/s",
-         QColor(100, 255, 100), QColor(150, 255, 150), QColor(255, 200, 100), // sim_color amarillo
-         -800.0, 800.0, false,
+         QColor(100, 255, 100), QColor(150, 255, 150), QColor(255, 200, 100),
+         0.0, 1600.0, false,
          "motor_velocity",
-         [](const TelemetryData &data)
-         { return data.motor_speed; },
-         [](const TelemetryData &data)
-         { return data.sim_motor_speed; }},
+         [](const TelemetryData &data) { return data.motor_speed; },
+         [](const TelemetryData &data) { return data.sim_motor_speed; }},
 
         {"PWM INPUT vs TIME",
          "PWM", "µs",
-         QColor(255, 120, 200), QColor(255, 170, 220), QColor(200, 100, 255), // sim_color púrpura
-         1000, 2000, true,
+         QColor(255, 120, 200), QColor(255, 170, 220), QColor(200, 100, 255),
+         1000.0, 2000.0, false,
          "pwm_input",
-         [](const TelemetryData &data)
-         { return data.pwm_input_us; },
-         [](const TelemetryData &data)
-         { return data.sim_pwm_input_us; }},
+         [](const TelemetryData &data) { return data.pwm_input_us; },
+         [](const TelemetryData &data) { return data.sim_pwm_input_us; }},
 
         {"DUTY CYCLE vs TIME",
          "Duty", "%",
-         QColor(255, 255, 0), QColor(255, 255, 100), QColor(100, 255, 255), // sim_color cyan
-         0, 15, true,
+         QColor(255, 255, 0), QColor(255, 255, 100), QColor(100, 255, 255),
+         5.0, 10.0, false,
          "duty_cycle",
-         [](const TelemetryData &data)
-         { return data.duty_cycle_percent; },
-         [](const TelemetryData &data)
-         { return data.sim_duty_cycle_percent; }}};
+         [](const TelemetryData &data) { return data.duty_cycle_percent; },
+         [](const TelemetryData &data) { return data.sim_duty_cycle_percent; }}};
 }
 
 void AerospaceDataVisualizer::createCharts()
@@ -226,25 +195,11 @@ void AerospaceDataVisualizer::createCharts()
 
         auto chart = std::make_unique<ChartBase>(config);
 
-        // Layout para 4 gráficas en 2x2:
-        // Row 0: ARM ANGLE (0,0), MOTOR VELOCITY (0,1)
-        // Row 1: PWM INPUT (1,0), DUTY CYCLE (1,1)
         int row = static_cast<int>(i / 2);
         int col = static_cast<int>(i % 2);
 
         main_layout_->addWidget(chart.get(), row, col);
         charts_.push_back(std::move(chart));
-    }
-
-    if (ros_node_)
-    {
-        RCLCPP_INFO(ros_node_->get_logger(),
-                    "Created %zu charts in 2x2 layout with real + simulation overlay:",
-                    charts_.size());
-        RCLCPP_INFO(ros_node_->get_logger(), "  - Angle: FIXED [0, 180] degrees");
-        RCLCPP_INFO(ros_node_->get_logger(), "  - Velocity: FIXED [-800, 800] rad/s");
-        RCLCPP_INFO(ros_node_->get_logger(), "  - PWM Input: AUTO-SCALE");
-        RCLCPP_INFO(ros_node_->get_logger(), "  - Duty Cycle: AUTO-SCALE");
     }
 }
 
@@ -253,80 +208,55 @@ double AerospaceDataVisualizer::calculateDutyCycle(double pwm_us) const
     return (pwm_us / PWM_PERIOD_US) * 100.0;
 }
 
-void AerospaceDataVisualizer::onDataReceived(double arm_angle, double motor_speed, double pwm_input_us,
-                                             double sim_arm_angle, double sim_motor_speed, double sim_pwm_input_us)
+void AerospaceDataVisualizer::onDataReceived(double arm_angle,
+                                             double motor_speed,
+                                             double pwm_input_us,
+                                             double sim_arm_angle,
+                                             double sim_motor_speed,
+                                             double sim_pwm_input_us)
 {
     QMutexLocker locker(update_mutex_);
 
     double current_time = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    if (current_time - last_update_time_ < 0.05)
-    {
-        return;
-    }
 
-    // Calcular duty cycles
-    double duty_cycle = calculateDutyCycle(pwm_input_us);
+    double duty_cycle     = calculateDutyCycle(pwm_input_us);
     double sim_duty_cycle = calculateDutyCycle(sim_pwm_input_us);
 
-    // Create telemetry data structure
     TelemetryData data;
-    data.timestamp = current_time;
-    data.datetime = QDateTime::currentDateTime();
-
-    // Datos reales
-    data.arm_angle = arm_angle;
-    data.motor_speed = motor_speed;
-    data.pwm_input_us = pwm_input_us;
-    data.duty_cycle_percent = duty_cycle;
-
-    // Datos de simulación
-    data.sim_arm_angle = sim_arm_angle;
-    data.sim_motor_speed = sim_motor_speed;
-    data.sim_pwm_input_us = sim_pwm_input_us;
+    data.timestamp              = current_time;
+    data.datetime               = QDateTime::currentDateTime();
+    data.arm_angle              = arm_angle;
+    data.motor_speed            = motor_speed;
+    data.pwm_input_us           = pwm_input_us;
+    data.duty_cycle_percent     = duty_cycle;
+    data.sim_arm_angle          = sim_arm_angle;
+    data.sim_motor_speed        = sim_motor_speed;
+    data.sim_pwm_input_us       = sim_pwm_input_us;
     data.sim_duty_cycle_percent = sim_duty_cycle;
 
-    // Validación de datos
-    auto isValidValue = [](double value) -> bool
-    {
-        return std::isfinite(value) && !std::isnan(value) && std::abs(value) < 1e6;
+    auto isValidValue = [](double value) -> bool {
+        return std::isfinite(value) && !std::isnan(value) &&
+               std::abs(value) < 1e6;
     };
 
-    // Update charts con AMBOS conjuntos de datos
     for (size_t i = 0; i < charts_.size() && i < chart_setups_.size(); ++i)
     {
         try
         {
-            // Agregar datos REALES
             double real_value = chart_setups_[i].data_extractor(data);
-            if (isValidValue(real_value))
+            if (isValidValue(real_value) && charts_[i])
             {
                 charts_[i]->addDataPoint(real_value, data.timestamp);
             }
-            else
-            {
-                double fallback_value = (chart_setups_[i].y_min + chart_setups_[i].y_max) / 2.0;
-                charts_[i]->addDataPoint(fallback_value, data.timestamp);
-            }
 
-            // Agregar datos de SIMULACIÓN
             double sim_value = chart_setups_[i].sim_data_extractor(data);
-            if (isValidValue(sim_value))
+            if (isValidValue(sim_value) && charts_[i])
             {
                 charts_[i]->addSimDataPoint(sim_value, data.timestamp);
             }
-            else
-            {
-                double fallback_value = (chart_setups_[i].y_min + chart_setups_[i].y_max) / 2.0;
-                charts_[i]->addSimDataPoint(fallback_value, data.timestamp);
-            }
         }
-        catch (const std::exception &e)
+        catch (const std::exception &)
         {
-            if (ros_node_)
-            {
-                RCLCPP_WARN_THROTTLE(ros_node_->get_logger(), *ros_node_->get_clock(), 10000,
-                                     "Chart update error for chart %zu: %s", i, e.what());
-            }
         }
     }
 
@@ -346,11 +276,6 @@ void AerospaceDataVisualizer::clearData()
     }
 
     last_update_time_ = 0;
-
-    if (ros_node_)
-    {
-        RCLCPP_INFO(ros_node_->get_logger(), "Cleared all chart data (real + simulation)");
-    }
 }
 
 void AerospaceDataVisualizer::setTimeWindow(double seconds)
@@ -366,12 +291,6 @@ void AerospaceDataVisualizer::setTimeWindow(double seconds)
             chart->setTimeWindow(time_window_sec_);
         }
     }
-
-    if (ros_node_)
-    {
-        RCLCPP_INFO(ros_node_->get_logger(),
-                    "Updated time window to %.1f seconds", time_window_sec_);
-    }
 }
 
 void AerospaceDataVisualizer::updateTheme()
@@ -384,11 +303,6 @@ void AerospaceDataVisualizer::updateTheme()
         {
             chart->updateTheme();
         }
-    }
-
-    if (ros_node_)
-    {
-        RCLCPP_DEBUG(ros_node_->get_logger(), "Updated chart themes");
     }
 }
 
@@ -403,23 +317,12 @@ void AerospaceDataVisualizer::setSmoothCurves(bool enabled)
             chart->setSmoothCurves(enabled);
         }
     }
-
-    if (ros_node_)
-    {
-        RCLCPP_INFO(ros_node_->get_logger(),
-                    "Smooth curves %s for all charts", enabled ? "enabled" : "disabled");
-    }
 }
 
 void AerospaceDataVisualizer::setMinorGridVisible(bool visible)
 {
+    (void)visible;
     QMutexLocker locker(update_mutex_);
-
-    if (ros_node_)
-    {
-        RCLCPP_INFO(ros_node_->get_logger(),
-                    "Minor grid lines %s", visible ? "enabled" : "disabled");
-    }
 }
 
 bool AerospaceDataVisualizer::isSmoothCurvesEnabled() const

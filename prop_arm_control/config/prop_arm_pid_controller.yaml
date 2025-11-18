@@ -1,0 +1,13 @@
+prop_arm_pid_controller:
+  ros__parameters:
+    Ts: 0.01
+    ref_deg: 60.0
+    pwm_min: 1000.0
+    pwm_max: 2000.0
+    angle_topic: "/arm_sim/angle_rad"
+    pwm_topic: "/arm_sim/esc/pwm_us"
+    pid.p: 0.1
+    pid.i: 1.5
+    pid.d: 0.15
+    pid.i_clamp: 100.0
+    pid.sample_time: 0.01

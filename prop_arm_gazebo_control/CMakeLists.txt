@@ -18,24 +18,12 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(gz_ros2_control REQUIRED)
 find_package(Eigen3 REQUIRED)
-
 find_package(gz-sim8 REQUIRED)
 find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
+find_package(prop_arm_characterization REQUIRED) 
 
 include_directories(include)
-
-# ============================================================================
-# MOTOR SPEED MODEL LIBRARY
-# ============================================================================
-add_library(motor_speed_model SHARED
-    src/motor_speed_model.cpp
-)
-target_compile_features(motor_speed_model PUBLIC c_std_99 cxx_std_17)
-target_include_directories(motor_speed_model PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
 
 # ============================================================================
 # HARDWARE INTERFACE LIBRARY
@@ -49,13 +37,9 @@ target_include_directories(prop_arm_hardware_interface PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(prop_arm_hardware_interface
-    motor_speed_model
-)
-
 ament_target_dependencies(prop_arm_hardware_interface
     hardware_interface pluginlib rclcpp rclcpp_lifecycle gz_ros2_control std_msgs
-    gz-sim8 gz-transport13 gz-msgs10
+    gz-sim8 gz-transport13 gz-msgs10 prop_arm_characterization
 )
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/prop_arm_hardware_interface_plugin.xml")
@@ -86,20 +70,11 @@ target_include_directories(step_test_input_node PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# PID Controller Node (from Arduino .ino logic)
-add_executable(pid_controller_node src/pid_controller_node.cpp)
-ament_target_dependencies(pid_controller_node rclcpp std_msgs)
-target_include_directories(pid_controller_node PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-
 # ============================================================================
 # INSTALLATION
 # ============================================================================
 
 install(TARGETS
-    motor_speed_model
     prop_arm_hardware_interface
     EXPORT export_${PROJECT_NAME}
     ARCHIVE DESTINATION lib
@@ -111,7 +86,6 @@ install(TARGETS
 install(TARGETS
     angle_hold_ss_controller
     step_test_input_node
-    pid_controller_node
     DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -132,7 +106,6 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(
     hardware_interface pluginlib rclcpp rclcpp_lifecycle gz_ros2_control
 )
-ament_export_libraries(motor_speed_model)
 
 # Tests
 if(BUILD_TESTING)

@@ -18,31 +18,24 @@ PropArmGuiNode::PropArmGuiNode(const rclcpp::NodeOptions &options)
 
     // Initialize timestamps and data
     last_data_time_ = this->get_clock()->now();
+    last_sim_data_time_ = this->get_clock()->now();
+    
     current_data_.system_timestamp = getSystemTimestamp();
     current_data_.datetime = QDateTime::currentDateTime();
     current_data_.timestamp = last_data_time_;
+    current_data_.valid = false;
+    current_data_.sim_valid = false;
 
     // Initialize simulation data to zeros
     current_data_.sim_arm_angle_deg = 0.0;
     current_data_.sim_motor_speed_rad_s = 0.0;
     current_data_.sim_pwm_input_us = 0.0;
     current_data_.sim_duty_cycle_percent = 0.0;
-
-    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node initialized");
-    RCLCPP_INFO(this->get_logger(), "System start time: %.6f", system_start_time_);
-    RCLCPP_INFO(this->get_logger(), "Monitoring REAL topics:");
-    RCLCPP_INFO(this->get_logger(), "  - /arm/angle_rad");
-    RCLCPP_INFO(this->get_logger(), "  - /arm/motor_vel_rad");
-    RCLCPP_INFO(this->get_logger(), "  - /esc/pwm_us_fb");
-    RCLCPP_INFO(this->get_logger(), "Monitoring SIMULATION topics:");
-    RCLCPP_INFO(this->get_logger(), "  - /arm_sim/angle_rad");
-    RCLCPP_INFO(this->get_logger(), "  - /arm_sim/motor_vel_rad");
-    RCLCPP_INFO(this->get_logger(), "  - /arm_sim/esc/pwm_us_fb");
 }
 
 PropArmGuiNode::~PropArmGuiNode()
 {
-    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node shutting down");
+    RCLCPP_INFO(this->get_logger(), "PropArm GUI Node shutting down.");
     data_recorder_.reset();
 }
 
@@ -56,7 +49,7 @@ double PropArmGuiNode::getSystemTimestamp() const
 
 void PropArmGuiNode::setupSubscribers()
 {
-    // Use BEST_EFFORT for real-time data (like your Gazebo simulation)
+    // Use BEST_EFFORT for real-time data
     auto qos_profile = rclcpp::QoS(100)
                            .reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
                            .durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
@@ -75,7 +68,7 @@ void PropArmGuiNode::setupSubscribers()
         "/esc/pwm_us_fb", qos_profile,
         std::bind(&PropArmGuiNode::pwmInputCallback, this, std::placeholders::_1));
 
-    // SIMULATION data subscribers - FIXED TOPIC NAMES
+    // SIMULATION data subscribers
     sim_arm_angle_sub_ = this->create_subscription<std_msgs::msg::Float64>(
         "/arm_sim/angle_rad", qos_profile,
         std::bind(&PropArmGuiNode::simArmAngleCallback, this, std::placeholders::_1));
@@ -87,8 +80,6 @@ void PropArmGuiNode::setupSubscribers()
     sim_pwm_input_sub_ = this->create_subscription<std_msgs::msg::UInt16>(
         "/arm_sim/esc/pwm_us_fb", qos_profile,
         std::bind(&PropArmGuiNode::simPwmInputCallback, this, std::placeholders::_1));
-
-    RCLCPP_INFO(this->get_logger(), "All subscribers configured with BEST_EFFORT QoS");
 }
 
 void PropArmGuiNode::setupPublishers()
@@ -99,8 +90,6 @@ void PropArmGuiNode::setupPublishers()
 
     velocity_cmd_pub_ = this->create_publisher<std_msgs::msg::Float64>(
         "/arm/motor_vel_rad", qos_profile);
-
-    RCLCPP_INFO(this->get_logger(), "Publishing velocity commands to /arm/motor_vel_rad");
 }
 
 double PropArmGuiNode::calculateDutyCycle(double pwm_us) const
@@ -122,6 +111,28 @@ void PropArmGuiNode::updateConnectionStatus()
     }
 }
 
+void PropArmGuiNode::updateSimConnectionStatus()
+{
+    auto now = this->get_clock()->now();
+    double time_since_last_sim = (now - last_sim_data_time_).seconds();
+
+    bool was_sim_connected = sim_connected_;
+    sim_connected_ = (time_since_last_sim < CONNECTION_TIMEOUT);
+
+    if (was_sim_connected != sim_connected_)
+    {
+        if (sim_connected_)
+        {
+            RCLCPP_INFO(this->get_logger(), "Simulation data connected");
+        }
+        else
+        {
+            RCLCPP_WARN(this->get_logger(), "Simulation data disconnected");
+        }
+    }
+}
+
+// REAL DATA CALLBACKS
 void PropArmGuiNode::armAngleCallback(const std_msgs::msg::Float64::SharedPtr msg)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
@@ -181,6 +192,9 @@ void PropArmGuiNode::motorSpeedCallback(const std_msgs::msg::Float64::SharedPtr 
     last_data_time_ = this->get_clock()->now();
     updateConnectionStatus();
 
+    QMetaObject::invokeMethod(this, [this]()
+                              { emit dataUpdated(); }, Qt::QueuedConnection);
+
     RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                           "REAL Motor velocity: %.2f rad/s", msg->data);
 }
@@ -197,26 +211,33 @@ void PropArmGuiNode::pwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg
     last_data_time_ = this->get_clock()->now();
     updateConnectionStatus();
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                         "REAL PWM: %u µs, Duty: %.2f%%",
-                         msg->data, current_data_.duty_cycle_percent);
-
     QMetaObject::invokeMethod(this, [this]()
                               { emit dataUpdated(); }, Qt::QueuedConnection);
+
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                         "REAL PWM: %u µs, Duty: %.2f%%",
+                         msg->data, current_data_.duty_cycle_percent);
 }
 
-// SIMULATION CALLBACKS - NOW WITH PROPER LOGGING AND DATA UPDATE
+// SIMULATION DATA CALLBACKS - NOW EMIT SEPARATE SIGNALS
 void PropArmGuiNode::simArmAngleCallback(const std_msgs::msg::Float64::SharedPtr msg)
 {
     std::lock_guard<std::mutex> lock(data_mutex_);
 
     current_data_.sim_arm_angle_deg = msg->data * 180.0 / M_PI;
+    current_data_.sim_valid = true;
+    
+    last_sim_data_time_ = this->get_clock()->now();
+    updateSimConnectionStatus();
 
-    // CRITICAL: Emit signal to update GUI
+    // CRITICAL: Emit BOTH signals to ensure updates
     QMetaObject::invokeMethod(this, [this]()
-                              { emit dataUpdated(); }, Qt::QueuedConnection);
+                              { 
+                                  emit simDataUpdated();
+                                  emit dataUpdated();  // Also emit general signal
+                              }, Qt::QueuedConnection);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                          "SIM Arm angle: %.2f° (%.4f rad)",
                          current_data_.sim_arm_angle_deg, msg->data);
 }
@@ -226,12 +247,18 @@ void PropArmGuiNode::simMotorSpeedCallback(const std_msgs::msg::Float64::SharedP
     std::lock_guard<std::mutex> lock(data_mutex_);
 
     current_data_.sim_motor_speed_rad_s = msg->data;
+    current_data_.sim_valid = true;
+    
+    last_sim_data_time_ = this->get_clock()->now();
+    updateSimConnectionStatus();
 
-    // CRITICAL: Emit signal to update GUI
     QMetaObject::invokeMethod(this, [this]()
-                              { emit dataUpdated(); }, Qt::QueuedConnection);
+                              { 
+                                  emit simDataUpdated();
+                                  emit dataUpdated();
+                              }, Qt::QueuedConnection);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                          "SIM Motor velocity: %.2f rad/s", msg->data);
 }
 
@@ -241,12 +268,18 @@ void PropArmGuiNode::simPwmInputCallback(const std_msgs::msg::UInt16::SharedPtr 
 
     current_data_.sim_pwm_input_us = static_cast<double>(msg->data);
     current_data_.sim_duty_cycle_percent = calculateDutyCycle(current_data_.sim_pwm_input_us);
+    current_data_.sim_valid = true;
+    
+    last_sim_data_time_ = this->get_clock()->now();
+    updateSimConnectionStatus();
 
-    // CRITICAL: Emit signal to update GUI
     QMetaObject::invokeMethod(this, [this]()
-                              { emit dataUpdated(); }, Qt::QueuedConnection);
+                              { 
+                                  emit simDataUpdated();
+                                  emit dataUpdated();
+                              }, Qt::QueuedConnection);
 
-    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+    RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                          "SIM PWM: %u µs, Duty: %.2f%%",
                          msg->data, current_data_.sim_duty_cycle_percent);
 }
@@ -350,9 +383,29 @@ bool PropArmGuiNode::isConnected() const
     return connected_;
 }
 
+bool PropArmGuiNode::isSimConnected() const
+{
+    return sim_connected_;
+}
+
 std::string PropArmGuiNode::getConnectionStatus() const
 {
-    return connected_ ? "Connected" : "Disconnected";
+    if (connected_ && sim_connected_)
+    {
+        return "Real + Sim Connected";
+    }
+    else if (connected_)
+    {
+        return "Real Connected";
+    }
+    else if (sim_connected_)
+    {
+        return "Sim Connected";
+    }
+    else
+    {
+        return "Disconnected";
+    }
 }
 
 std::string PropArmGuiNode::getControlMode() const

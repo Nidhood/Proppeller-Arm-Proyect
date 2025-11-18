@@ -35,13 +35,16 @@ def generate_launch_description():
     pkg_gz   = FindPackageShare("prop_arm_gazebo")
     pkg_desc = FindPackageShare("prop_arm_description")
     pkg_ctrl = FindPackageShare("prop_arm_gazebo_control")
+    pkg_pid_ctrl = FindPackageShare("prop_arm_control")
     pkg_gui  = FindPackageShare("prop_arm_gui")
 
     # Launch files
     gazebo_launch     = PathJoinSubstitution([pkg_gz,   "launch", "start_world.launch.py"])
     urdf_launch       = PathJoinSubstitution([pkg_desc, "launch", "publish_urdf.launch.py"])
     spawn_launch      = PathJoinSubstitution([pkg_gz,   "launch", "spawn_prop_arm_description.launch.py"])
+    spawn_models_launch = PathJoinSubstitution([pkg_gz, "launch", "spawn_models.launch.py"])
     controller_launch = PathJoinSubstitution([pkg_ctrl, "launch", "load_controller.launch.py"])
+    pid_controller_launch = PathJoinSubstitution([pkg_pid_ctrl, "launch", "pid_controller.launch.py"])
     gui_launch        = PathJoinSubstitution([pkg_gui,  "launch", "display_gui.launch.py"])
 
     return LaunchDescription([
@@ -72,8 +75,17 @@ def generate_launch_description():
                 launch_arguments={'use_sim_time': use_sim_time}.items()
             ) ]
         ),
+        
+        #4. Spawn object models in Gazebo:
+        TimerAction(
+            period=4.0,
+            actions=[ IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(spawn_models_launch),
+                launch_arguments={'use_sim_time': use_sim_time}.items()
+            ) ]
+        ),
 
-        # 4. Load controllers:
+        # 5. Load gazebo controllers:
         TimerAction(
             period=6.0,
             actions=[ IncludeLaunchDescription(
@@ -81,8 +93,17 @@ def generate_launch_description():
                 launch_arguments={'use_sim_time': use_sim_time}.items()
             ) ]
         ),
+        
+        # 6. Load PID controller node:
+        # TimerAction(
+        #     period=20.0,
+        #     actions=[ IncludeLaunchDescription(
+        #         PythonLaunchDescriptionSource(pid_controller_launch),
+        #         launch_arguments={'use_sim_time': use_sim_time}.items()
+        #     ) ]
+        # ),
 
-        # 5. Launch PropArm GUI with fixed delay:
+        # 7. Launch PropArm GUI with fixed delay:
         # TimerAction(
         #     period=8.0, 
         #     actions=[ IncludeLaunchDescription(

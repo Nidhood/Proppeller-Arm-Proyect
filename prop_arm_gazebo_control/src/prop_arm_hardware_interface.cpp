@@ -6,21 +6,24 @@
 #include "pluginlib/class_list_macros.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include <cmath>
-
+#include <type_traits>
+#include <algorithm>
+#include <string>
 namespace prop_arm_gazebo_control
 {
 
     // ========================================================================
-    // INITIALIZATION
+    //                            INITIALIZATION                             //
     // ========================================================================
 
-    // Hardware interface initialization in Gazebo simulation.
+    // Hardware interface initialization in Gazebo simulation:
     bool PropArmHardware::initSim(rclcpp::Node::SharedPtr &model_nh,
                                   std::map<std::string, sim::Entity> &joints,
                                   const hardware_interface::HardwareInfo &hardware_info,
                                   sim::EntityComponentManager &ecm,
                                   unsigned int /*update_rate*/)
     {
+        // Node, Gazebo transport, and enabled joints handling:
         nh_ = model_nh;
         ecm_ = &ecm;
         enabled_joints_ = joints;
@@ -29,12 +32,44 @@ namespace prop_arm_gazebo_control
         loadParameters(hardware_info);
 
         // Initialize motor model
-        motor_model_ = MotorSpeedModel{Kw_, tau_w_, Ts_, pwm_ref_us_, 0.0};
+        motor_model_ = prop_arm_characterization::MotorSpeedModel{
+            Kw_, tau_w_, Ts_, pwm_ref_us_, 0.0};
 
-        // Setup communication
-        setupGazeboTransport();
-        setupROSPublishers();
-        setupROSSubscribers();
+        // =======================================
+        // Setup communication between Gazebo and ROS2
+        // =======================================
+
+        // Setup Gazebo transport:
+        gz_node_ = std::make_unique<gz::transport::Node>();
+        actuators_pub_ = gz_node_->Advertise<gz::msgs::Actuators>(actuators_topic_);
+
+        // Setup ROS2 publishers:
+        motor_speed_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
+            nsTopic(robot_namespace_, "motor_vel_rad"),
+            rclcpp::QoS(100).best_effort());
+
+        arm_angle_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
+            nsTopic(robot_namespace_, "angle_rad"),
+            rclcpp::QoS(50).best_effort());
+
+        // PWM feedback publisher (UInt16)
+        vpwm_pub_ = nh_->create_publisher<std_msgs::msg::UInt16>(
+            nsTopic(robot_namespace_, "esc/pwm_us_fb"),
+            rclcpp::QoS(400).best_effort());
+
+        // Setup ROS2 subscribers: PWM command as UInt16
+        pwm_cmd_sub_ = nh_->create_subscription<std_msgs::msg::UInt16>(
+            nsTopic(robot_namespace_, "esc/pwm_us"),
+            rclcpp::QoS(400).best_effort(),
+            [this](const std_msgs::msg::UInt16::SharedPtr msg)
+            {
+                const auto raw_pwm = msg->data;
+                const int clamped = std::clamp(
+                    static_cast<int>(raw_pwm),
+                    static_cast<int>(pwm_min_us_),
+                    static_cast<int>(pwm_max_us_));
+                current_pwm_us_ = static_cast<std::uint16_t>(clamped);
+            });
 
         // Setup ros2_control interfaces
         setupControlInterfaces(hardware_info, ecm);
@@ -57,16 +92,16 @@ namespace prop_arm_gazebo_control
     hardware_interface::CallbackReturn
     PropArmHardware::on_activate(const rclcpp_lifecycle::State &)
     {
-        // Reset joint states
+        // Reset joint states:
         auto &jd = joints_[joint_name_];
         jd.position_output = 0.0;
         jd.velocity_output = 0.0;
 
-        // Stop motor
+        // Stop motor:
         gz::msgs::Actuators msg;
         actuators_pub_.Publish(msg);
 
-        // Reset motor model
+        // Reset motor model:
         motor_model_.reset();
         current_pwm_us_ = pwm_ref_us_;
 
@@ -150,73 +185,81 @@ namespace prop_arm_gazebo_control
     // ========================================================================
 
     // Load parameters from hardware info.
-    void PropArmHardware::loadParameters(const hardware_interface::HardwareInfo &hardware_info)
+    void prop_arm_gazebo_control::PropArmHardware::loadParameters(
+    const hardware_interface::HardwareInfo &hardware_info)
     {
+        // Helper genérico para leer parámetros desde hardware_info.hardware_parameters
         auto getParam = [&](const std::string &name, auto &variable, auto default_val)
         {
-            if (auto it = hardware_info.hardware_parameters.find(name);
-                it != hardware_info.hardware_parameters.end())
+            using T = std::decay_t<decltype(variable)>;
+
+            auto it = hardware_info.hardware_parameters.find(name);
+            if (it == hardware_info.hardware_parameters.end())
             {
-                if constexpr (std::is_same_v<std::decay_t<decltype(variable)>, std::string>)
-                    variable = it->second;
-                else if constexpr (std::is_same_v<std::decay_t<decltype(variable)>, int>)
-                    variable = static_cast<int>(std::stod(it->second));
+                // Si no existe el parámetro, usar el valor por defecto
+                if constexpr (std::is_same_v<T, std::string>)
+                {
+                    variable = default_val;
+                }
                 else
-                    variable = std::max(default_val, std::stod(it->second));
+                {
+                    variable = static_cast<T>(default_val);
+                }
+                return;
             }
-        };
 
-        getParam("robot_namespace", robot_namespace_, std::string{});
-        getParam("actuators_topic", actuators_topic_, std::string{});
-        getParam("joint_name", joint_name_, std::string{"arm_link_joint"});
-        getParam("prop_radius_m", prop_radius_m_, 0.0);
-        getParam("Kw", Kw_, 0.0);
-        getParam("tau_w", tau_w_, 0.0);
-        getParam("Ts", Ts_, 1e-12);
-        getParam("pwm_ref_us", pwm_ref_us_, 1);
-        getParam("pwm_max_us", pwm_max_us_, 1);
-        getParam("pwm_min_us", pwm_min_us_, 1);
-    }
+            const std::string &val_str = it->second;
 
-    // Setup Gazebo transport node and publishers.
-    void PropArmHardware::setupGazeboTransport()
-    {
-        gz_node_ = std::make_unique<gz::transport::Node>();
-        actuators_pub_ = gz_node_->Advertise<gz::msgs::Actuators>(actuators_topic_);
-    }
-
-    // Setup ROS publishers for telemetry.
-    void PropArmHardware::setupROSPublishers()
-    {
-        auto motor_speed_topic = nsTopic(robot_namespace_, "motor_vel_rad");
-        auto angle_topic = nsTopic(robot_namespace_, "angle_rad");
-        auto vpwm_topic = nsTopic(robot_namespace_, "esc/pwm_us_fb");
-
-        motor_speed_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
-            motor_speed_topic, rclcpp::QoS(100).best_effort());
-
-        arm_angle_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
-            angle_topic, rclcpp::QoS(50).best_effort());
-
-        vpwm_pub_ = nh_->create_publisher<std_msgs::msg::Float64>(
-            vpwm_topic, rclcpp::QoS(400).best_effort());
-    }
-
-    // Setup ROS subscribers for receiving commands.
-    void PropArmHardware::setupROSSubscribers()
-    {
-        auto pwm_cmd_topic = nsTopic(robot_namespace_, "esc/pwm_us");
-
-        pwm_cmd_sub_ = nh_->create_subscription<std_msgs::msg::Float64>(
-            pwm_cmd_topic, rclcpp::QoS(400).best_effort(),
-            [this](const std_msgs::msg::Float64::SharedPtr msg)
+            if constexpr (std::is_same_v<T, std::string>)
             {
-                current_pwm_us_ = std::clamp(
-                    static_cast<int>(msg->data),
-                    pwm_min_us_,
-                    pwm_max_us_);
-            });
-    }
+                // Parámetro tipo string
+                variable = val_str;
+            }
+            else if constexpr (std::is_same_v<T, int>)
+            {
+                // Parámetro tipo int
+                variable = static_cast<int>(std::stoi(val_str));
+            }
+            else if constexpr (std::is_integral_v<T>)
+            {
+                // Cualquier entero (incluye std::uint16_t, std::uint32_t, etc.)
+                long long v = std::stoll(val_str);
+                variable = static_cast<T>(v);
+            }
+            else if constexpr (std::is_floating_point_v<T>)
+            {
+                // Parámetro en coma flotante: aplicar mínimo con default_val
+                double v = std::stod(val_str);
+                double def = static_cast<double>(default_val);
+                variable = static_cast<T>(std::max(def, v));
+            }
+            else
+            {
+                static_assert(std::is_arithmetic_v<T>,
+                            "Tipo de parámetro no soportado en getParam");
+            }
+    };
+
+    // Strings
+    getParam("robot_namespace", robot_namespace_, std::string("prop_arm"));
+    getParam("actuators_topic", actuators_topic_, std::string("/prop_arm/command/motor_speed"));
+    getParam("joint_name",      joint_name_,      std::string("arm_link_joint"));
+
+    // Parámetros físicos / modelo
+    getParam("prop_radius_m", prop_radius_m_, 0.10); // [m]
+    getParam("Kw",            Kw_,           0.0);   // [rad/s por unidad de entrada]
+    getParam("tau_w",         tau_w_,        0.0);   // [s]
+    getParam("Ts",            Ts_,           0.01);  // [s]
+
+    // PWM (UInt16) en microsegundos
+    getParam("pwm_ref_us", pwm_ref_us_, static_cast<std::uint16_t>(1500));
+    getParam("pwm_min_us", pwm_min_us_, static_cast<std::uint16_t>(1000));
+    getParam("pwm_max_us", pwm_max_us_, static_cast<std::uint16_t>(2000));
+
+    // Índice del actuador en el mensaje Actuators
+    getParam("actuator_index", actuator_index_, 0);
+}
+
 
     // Setup ros2_control interfaces based on hardware info.
     void PropArmHardware::setupControlInterfaces(
@@ -281,9 +324,9 @@ namespace prop_arm_gazebo_control
         speed_msg.data = motor_speed;
         motor_speed_pub_->publish(speed_msg);
 
-        // PWM feedback [us]
-        std_msgs::msg::Float64 pwm_msg;
-        pwm_msg.data = static_cast<double>(current_pwm_us_);
+        // PWM feedback [us] as UInt16
+        std_msgs::msg::UInt16 pwm_msg;
+        pwm_msg.data = current_pwm_us_;
         vpwm_pub_->publish(pwm_msg);
     }
 

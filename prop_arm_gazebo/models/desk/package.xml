@@ -1,0 +1,19 @@
+<package format="2">
+  <name>prop_arm_gazebo</name>
+  <version>def: None</version>
+  <description>
+    prop_arm_gazebo model - Processed by phobos-ci
+  </description>
+  <author>Nidhood ivan.oroz34@gmail.com</author>
+  <maintainer>Nidhood ivan.oroz34@gmail.com</maintainer>
+  <url>https://github.com/Nidhood/Proppeller-Arm-Proyect.git</url>
+  <buildtool_depend>catkin</buildtool_depend>
+  <!--<depend>roslaunch</depend>-->
+  <depend>robot_state_publisher</depend>
+  <depend>rviz</depend>
+  <depend>joint_state_publisher</depend>
+  <!--<depend>gazebo</depend>-->
+  <export>
+    <architecture_independent />
+  </export>
+</package>
