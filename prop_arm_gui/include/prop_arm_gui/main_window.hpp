@@ -23,14 +23,14 @@
 #include <QStatusBar>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QCheckBox>
 #include <memory>
 #include <future>
 
-
 #include "prop_arm_gui/prop_arm_gui_node.hpp"
 #include "prop_arm_gui/data_exporter.hpp"
+#include "prop_arm_gui/chart_base.hpp"
 
-// Forward declaration
 class AerospaceDataVisualizer;
 
 class MainWindow : public QMainWindow
@@ -44,18 +44,19 @@ public:
 private slots:
     void updateDisplays();
     void onAngleSliderChanged(int value);
-    void onVelocitySliderChanged(int value);
+    void onPWMSliderChanged(int value);
+    void onAutoModeToggled(bool checked);
     void onStopClicked();
     void onStabilizeClicked();
     void onRefreshClicked();
     void onExportDataClicked();
-    
-    // Recording slots
     void onStartRecordingClicked();
     void onStopRecordingClicked();
     void onRecordingStarted(double duration);
     void onRecordingProgress(double remaining_time, size_t point_count);
     void onRecordingCompleted(size_t point_count, double duration);
+    void onStartStepTestClicked();
+    void onStopStepTestClicked();
 
 private:
     void setupUI();
@@ -63,56 +64,52 @@ private:
     void setupUbuntuScreenGeometry();
     void setupControlTab();
     void setupControlPanel();
-    void setupMonitoringPanel();
+    void setupControlCharts();
     void createStatusBar();
 
-    // Core components
     std::shared_ptr<PropArmGuiNode> ros_node_;
     QTimer *update_timer_;
 
-    // Main UI structure
     QWidget *central_widget_;
     QTabWidget *tab_widget_;
 
-    // Tab widgets
-    AerospaceDataVisualizer *data_visualizer_;
     QWidget *control_widget_;
+    AerospaceDataVisualizer *data_visualizer_;
 
-    // Control panel components
     QGroupBox *control_group_;
+
     QSlider *angle_slider_;
-    QSlider *velocity_slider_;
+    QSlider *pwm_slider_;
     QDoubleSpinBox *angle_spinbox_;
-    QDoubleSpinBox *velocity_spinbox_;
+    QSpinBox *pwm_spinbox_;
+    QCheckBox *auto_mode_checkbox_;
     QPushButton *stop_btn_;
     QPushButton *stabilize_btn_;
     QPushButton *refresh_btn_;
     QPushButton *export_btn_;
-    
-    // Recording components
+
+    QDoubleSpinBox *step_angle_low_spinbox_;
+    QDoubleSpinBox *step_angle_high_spinbox_;
+    QDoubleSpinBox *step_time_up_spinbox_;
+    QDoubleSpinBox *step_time_down_spinbox_;
+    QPushButton *start_step_test_btn_;
+    QPushButton *stop_step_test_btn_;
+
     QDoubleSpinBox *recording_duration_spinbox_;
     QPushButton *start_recording_btn_;
     QPushButton *stop_recording_btn_;
     QLabel *recording_status_label_;
     QProgressBar *recording_progress_bar_;
 
-    // Monitoring panel components
-    QGroupBox *monitor_group_;
-    QLabel *arm_angle_value_;
-    QLabel *motor_speed_value_;
-    QLabel *pwm_input_value_;
-    QLabel *duty_cycle_value_;
-    QLabel *error_value_;
-    QLabel *motor_cmd_value_;
-    QProgressBar *angle_progress_;
-    QProgressBar *velocity_progress_;
+    // NUEVAS GRÁFICAS PARA LA VENTANA DE CONTROL
+    ChartBase *angle_vs_reference_chart_;
+    ChartBase *error_chart_;
+    ChartBase *motor_velocity_chart_;
 
-    // Status indicators
     QLabel *connection_status_;
     QLabel *control_mode_;
     QLabel *system_status_;
 
-    // Aerospace color scheme
     const QString PRIMARY_COLOR = "#1a365d";
     const QString SECONDARY_COLOR = "#2563eb";
     const QString SUCCESS_COLOR = "#00ff88";
