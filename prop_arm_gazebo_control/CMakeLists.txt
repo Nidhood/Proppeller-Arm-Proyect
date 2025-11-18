@@ -1,12 +1,20 @@
 cmake_minimum_required(VERSION 3.16)
+
+# Project name:
 project(prop_arm_gazebo_control)
 
-# Warnings
+# Set C++ standard:
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
+
+# Compiler options:
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# Dependencies
+# Dependencies:
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
@@ -23,11 +31,12 @@ find_package(gz-transport13 REQUIRED)
 find_package(gz-msgs10 REQUIRED)
 find_package(prop_arm_characterization REQUIRED) 
 
+# Include directories:
 include_directories(include)
 
-# ============================================================================
-# HARDWARE INTERFACE LIBRARY
-# ============================================================================
+# ---------------------- Build libraries -------------------------
+
+# Hardware Interface Library
 add_library(prop_arm_hardware_interface SHARED
     src/prop_arm_hardware_interface.cpp 
 )
@@ -36,19 +45,15 @@ target_include_directories(prop_arm_hardware_interface PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-
 ament_target_dependencies(prop_arm_hardware_interface
     hardware_interface pluginlib rclcpp rclcpp_lifecycle gz_ros2_control std_msgs
     gz-sim8 gz-transport13 gz-msgs10 prop_arm_characterization
 )
-
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/prop_arm_hardware_interface_plugin.xml")
     pluginlib_export_plugin_description_file(gz_ros2_control prop_arm_hardware_interface_plugin.xml)
 endif()
 
-# ============================================================================
-# EXECUTABLES
-# ============================================================================
+# --------------------- Build executables ------------------------
 
 # Angle Hold State-Space Controller
 add_executable(angle_hold_ss_controller
@@ -70,10 +75,9 @@ target_include_directories(step_test_input_node PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-# ============================================================================
-# INSTALLATION
-# ============================================================================
+# ---------------------- Install targets -------------------------
 
+# Install libraries:
 install(TARGETS
     prop_arm_hardware_interface
     EXPORT export_${PROJECT_NAME}
@@ -82,20 +86,17 @@ install(TARGETS
     RUNTIME DESTINATION bin
 )
 
-# Executables
+# Install executables:
 install(TARGETS
     angle_hold_ss_controller
     step_test_input_node
     DESTINATION lib/${PROJECT_NAME}
 )
 
-# Other assets
-install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/ OPTIONAL)
-install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config/ OPTIONAL)
-install(DIRECTORY launch urdf config include src 
+# Install directories:
+install(DIRECTORY launch config urdf
     DESTINATION share/${PROJECT_NAME}
 )
-install(DIRECTORY include/ DESTINATION include/)
 
 # Install plugin XML only if it exists
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/prop_arm_hardware_interface_plugin.xml")
@@ -107,10 +108,5 @@ ament_export_dependencies(
     hardware_interface pluginlib rclcpp rclcpp_lifecycle gz_ros2_control
 )
 
-# Tests
-if(BUILD_TESTING)
-    find_package(ament_lint_auto REQUIRED)
-    ament_lint_auto_find_test_dependencies()
-endif()
-
+# Ament package:
 ament_package()

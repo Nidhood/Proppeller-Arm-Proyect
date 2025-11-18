@@ -13,7 +13,7 @@ from launch.conditions import IfCondition
 # ----------------------------- LAUNCH SCRIPT ----------------------------
 def generate_launch_description():
     
-    # Launch arguments
+    # Launch arguments:
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time', default_value='true',
         description='Use simulation (Gazebo) clock'
@@ -31,14 +31,14 @@ def generate_launch_description():
         description='Delay before launching GUI (seconds)'
     )
 
-    # Find your packages
+    # Find your packages:
     pkg_gz   = FindPackageShare("prop_arm_gazebo")
     pkg_desc = FindPackageShare("prop_arm_description")
     pkg_ctrl = FindPackageShare("prop_arm_gazebo_control")
     pkg_pid_ctrl = FindPackageShare("prop_arm_control")
     pkg_gui  = FindPackageShare("prop_arm_gui")
 
-    # Launch files
+    # Launch files:
     gazebo_launch     = PathJoinSubstitution([pkg_gz,   "launch", "start_world.launch.py"])
     urdf_launch       = PathJoinSubstitution([pkg_desc, "launch", "publish_urdf.launch.py"])
     spawn_launch      = PathJoinSubstitution([pkg_gz,   "launch", "spawn_prop_arm_description.launch.py"])
@@ -95,13 +95,13 @@ def generate_launch_description():
         ),
         
         # 6. Load PID controller node:
-        # TimerAction(
-        #     period=20.0,
-        #     actions=[ IncludeLaunchDescription(
-        #         PythonLaunchDescriptionSource(pid_controller_launch),
-        #         launch_arguments={'use_sim_time': use_sim_time}.items()
-        #     ) ]
-        # ),
+        TimerAction(
+            period=20.0,
+            actions=[ IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(pid_controller_launch),
+                launch_arguments={'use_sim_time': use_sim_time}.items()
+            ) ]
+        ),
 
         # 7. Launch PropArm GUI with fixed delay:
         # TimerAction(

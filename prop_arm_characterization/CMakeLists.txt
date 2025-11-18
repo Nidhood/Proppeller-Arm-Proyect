@@ -20,9 +20,7 @@ find_package(ament_cmake REQUIRED)
 # Include directories:
 include_directories(include)
 
-# =============================================================== #
-#                        Build libraries                          #
-# =============================================================== #
+# ---------------------- Build libraries -------------------------
 
 # Motor speed model library build:
 add_library(motor_speed_model SHARED
@@ -34,9 +32,7 @@ target_include_directories(motor_speed_model PUBLIC
     $<INSTALL_INTERFACE:include> 
 )
 
-# =============================================================== #
-#                        Install targets                          #                  
-# =============================================================== #
+# ---------------------- Install targets --------------------------
 
 # Install headers:
 install(DIRECTORY include/

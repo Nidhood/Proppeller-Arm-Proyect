@@ -3,7 +3,7 @@
 namespace prop_arm_characterization
 {
 
-// Constructor with parameters
+// Constructor with parameters.
 MotorSpeedModel::MotorSpeedModel(double kw,
                                  double taw_w,
                                  double Ts,
@@ -15,7 +15,7 @@ MotorSpeedModel::MotorSpeedModel(double kw,
     b_ = kw * (1.0 - a_);
 }
 
-// Simple first-order motor speed model implementation PWM [us] to speed [rad/s]
+// Simple first-order motor speed model implementation PWM [us] to speed [rad/s].
 double MotorSpeedModel::update(std::uint16_t pwm_us) noexcept
 {
     const double du =
@@ -24,19 +24,19 @@ double MotorSpeedModel::update(std::uint16_t pwm_us) noexcept
     return w_;
 }
 
-// Get current speed [rad/s]
+// Get current speed [rad/s].
 double MotorSpeedModel::getSpeedRadSec() const noexcept
 {
     return w_;
 }
 
-// Reset model state
+// Reset model state.
 void MotorSpeedModel::reset() noexcept
 {
     w_ = 0.0;
 }
 
-// Equality operator
+// Equality operator.
 bool MotorSpeedModel::operator==(const MotorSpeedModel &other) const noexcept
 {
     return (a_ == other.a_) &&

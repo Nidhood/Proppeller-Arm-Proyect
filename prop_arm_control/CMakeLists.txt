@@ -22,9 +22,7 @@ find_package(std_msgs REQUIRED)
 # Include directories:
 include_directories(include)
 
-# =============================================================== #
-#                        Build executables                        #
-# =============================================================== #
+# --------------------- Build executables ------------------------
 
 # PID Controller Node library build:
 add_executable(pid_controller_node src/pid_controller_node.cpp)
@@ -34,9 +32,7 @@ target_include_directories(pid_controller_node PUBLIC
     $<INSTALL_INTERFACE:include> 
 )
 
-# =============================================================== #
-#                        Install targets                          #                  
-# =============================================================== #
+# ---------------------- Install targets -------------------------
 
 # Install executables:
 install(TARGETS pid_controller_node

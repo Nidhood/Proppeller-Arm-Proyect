@@ -10,7 +10,8 @@ from launch_ros.substitutions import FindPackageShare
 
 # ----------------------------- LAUNCH SCRIPT ----------------------------
 def generate_launch_description():
-    # Launch arguments
+    
+    # Launch arguments:
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
@@ -18,10 +19,10 @@ def generate_launch_description():
         description='Use simulation (Gazebo) clock'
     )
 
-    # Find package share directory
+    # Find package share directory:
     pkg_gz = FindPackageShare("prop_arm_gazebo")
 
-    # Path to desk SDF model
+    # Path to desk SDF model:
     desk_sdf_path = PathJoinSubstitution([
         pkg_gz,
         "models",
@@ -30,7 +31,7 @@ def generate_launch_description():
         "desk.sdf"
     ])
 
-    # Path to lamp SDF model
+    # Path to lamp SDF model:
     lamp_sdf_path = PathJoinSubstitution([
         pkg_gz,
         "models",
@@ -39,17 +40,17 @@ def generate_launch_description():
         "lamp.sdf"
     ])
 
-    # Desk spawn configuration
+    # Desk spawn configuration:
     desk_name = "office_desk"
-    desk_position = [-0.19, -0.03, 0.54]      # X, Y, Z (meters)
-    desk_orientation = [0.0, 0.0, 0.0]        # Roll, Pitch, Yaw (radians)
+    desk_position = [-0.19, -0.03, 0.54]       # X, Y, Z (meters)
+    desk_orientation = [0.0, 0.0, 0.0]         # Roll, Pitch, Yaw (radians)
 
-    # Lamp spawn configuration
+    # Lamp spawn configuration:
     lamp_name = "desk_lamp"
-    lamp_position = [-0.68, 0.20, 0.84]       # X, Y, Z (meters) - on top of desk
+    lamp_position = [-0.68, 0.20, 0.84]        # X, Y, Z (meters)
     lamp_orientation = [0.0, 0.0, 2.08]        # Roll, Pitch, Yaw (radians)
 
-    # Spawn desk model in Gazebo
+    # Spawn desk model in Gazebo:
     spawn_desk = Node(
         package='ros_gz_sim',
         executable='create',
@@ -69,7 +70,7 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}]
     )
 
-    # Spawn lamp model in Gazebo
+    # Spawn lamp model in Gazebo:
     spawn_lamp = Node(
         package='ros_gz_sim',
         executable='create',

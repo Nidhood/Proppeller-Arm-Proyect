@@ -23,7 +23,7 @@ struct PropArmData
     double error = 0.0;
     double target_angle = 0.0;
 
-    // Datos de simulación
+    // NUEVO: Datos de simulación
     double sim_arm_angle_deg = 0.0;
     double sim_motor_speed_rad_s = 0.0;
     double sim_pwm_input_us = 0.0;
@@ -33,7 +33,6 @@ struct PropArmData
     QDateTime datetime;
     rclcpp::Time timestamp;
     bool valid = false;
-    bool sim_valid = false;  // NEW: Track simulation data validity separately
 };
 
 class DataRecorder;
@@ -54,7 +53,6 @@ public:
     void sendStopCommand();
 
     bool isConnected() const;
-    bool isSimConnected() const;  // NEW: Check simulation connection
     std::string getConnectionStatus() const;
     std::string getControlMode() const;
     double getSimulationStartTime() const { return system_start_time_; }
@@ -69,7 +67,6 @@ public:
 
 signals:
     void dataUpdated();
-    void simDataUpdated();  // NEW: Separate signal for simulation data
     void connectionChanged(bool connected);
     void errorOccurred(const QString &error);
     void recordingStarted(double duration);
@@ -80,7 +77,6 @@ private:
     void setupSubscribers();
     void setupPublishers();
     void updateConnectionStatus();
-    void updateSimConnectionStatus();  // NEW: Check simulation connection
     double getSystemTimestamp() const;
     double calculateDutyCycle(double pwm_us) const;
 
@@ -89,7 +85,7 @@ private:
     void motorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void pwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg);
 
-    // Callbacks para datos de simulación
+    // NUEVO: Callbacks para datos de simulación
     void simArmAngleCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void simMotorSpeedCallback(const std_msgs::msg::Float64::SharedPtr msg);
     void simPwmInputCallback(const std_msgs::msg::UInt16::SharedPtr msg);
@@ -102,7 +98,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr motor_speed_sub_;
     rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr pwm_input_sub_;
 
-    // Subscribers simulados
+    // NUEVO: Subscribers simulados
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sim_arm_angle_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr sim_motor_speed_sub_;
     rclcpp::Subscription<std_msgs::msg::UInt16>::SharedPtr sim_pwm_input_sub_;
@@ -118,9 +114,7 @@ private:
     double system_start_time_;
 
     rclcpp::Time last_data_time_;
-    rclcpp::Time last_sim_data_time_;  
     bool connected_ = false;
-    bool sim_connected_ = false;
     std::string control_mode_ = "Manual";
     static constexpr double CONNECTION_TIMEOUT = 2.0;
 

@@ -4,7 +4,7 @@
     <static>true</static>
     <link name="desk_link">
 
-      <!-- Collision using STL -->
+      <!-- Collision -->
       <collision name="desk_collision">
         <pose>0.00000 0.00000 0.00000 0.00000 0.00000 0.00000</pose>
         <geometry>
@@ -37,7 +37,7 @@
         <mass>20.00000</mass>
       </inertial>
 
-      <!-- Visual using DAE with improved material -->
+      <!-- Visual -->
       <visual name="desk">
         <pose>0.00000 0.00000 0.00000 0.00000 0.00000 0.00000</pose>
         <geometry>

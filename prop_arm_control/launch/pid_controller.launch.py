@@ -1,8 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# -------------------------- LAUNCH DEPENDENCIES -------------------------
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 
+# ----------------------------- LAUNCH SCRIPT ----------------------------
 def generate_launch_description():
     pkg = get_package_share_directory('prop_arm_control')
     cfg = os.path.join(pkg, 'config', 'prop_arm_pid_controller.yaml')

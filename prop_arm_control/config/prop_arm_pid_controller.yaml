@@ -4,8 +4,12 @@ prop_arm_pid_controller:
     ref_deg: 60.0
     pwm_min: 1000.0
     pwm_max: 2000.0
+    pwm_idle_us: 1182.0
+    kff_pwm_per_sin: 176.0
+    enable_ff: true
     angle_topic: "/arm_sim/angle_rad"
     pwm_topic: "/arm_sim/esc/pwm_us"
+    ref_angle_topic: "/arm_sim/ref_angle_rad"
     pid.p: 0.1
     pid.i: 1.5
     pid.d: 0.15

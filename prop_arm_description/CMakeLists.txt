@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
+
+# Project name:
 project(prop_arm_description)
 
+# Set C++ standard:
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+endif()
 
 # Compiler options:
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -10,16 +17,12 @@ endif()
 # Find ros dependencies:
 find_package(ament_cmake REQUIRED)
 
+# ---------------------- Install targets -------------------------
+
 # Install directories inside the package:
 install(DIRECTORY launch models rviz
     DESTINATION share/${PROJECT_NAME}
-    )
-
-# Testing options:
-if(BUILD_TESTING)
-    find_package(ament_lint_auto REQUIRED)
-    ament_lint_auto_find_test_dependencies()
-endif()
+)
 
 # Ament package configuration:
 ament_package()

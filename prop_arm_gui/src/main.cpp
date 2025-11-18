@@ -16,39 +16,23 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
     setupStyles();
 
     update_timer_ = new QTimer(this);
-    update_timer_->setInterval(50);  // 20 Hz update rate
+    update_timer_->setInterval(50);
     connect(update_timer_, &QTimer::timeout, this, &MainWindow::updateDisplays);
     update_timer_->start();
 
     if (ros_node_)
     {
-        // Connect BOTH dataUpdated AND simDataUpdated signals
         connect(ros_node_.get(), &PropArmGuiNode::dataUpdated,
-                this, &MainWindow::updateDisplays, Qt::QueuedConnection);
-
-        connect(ros_node_.get(), &PropArmGuiNode::simDataUpdated,
                 this, &MainWindow::updateDisplays, Qt::QueuedConnection);
 
         connect(ros_node_.get(), &PropArmGuiNode::connectionChanged, this, [this](bool connected)
                 {
-            QString status;
-            if (ros_node_->isSimConnected() && connected) {
-                status = "Real + Sim Connected";
-            } else if (connected) {
-                status = "Real Connected";
-            } else if (ros_node_->isSimConnected()) {
-                status = "Sim Connected";
-            } else {
-                status = "Disconnected";
-            }
-            
-            connection_status_->setText(status);
-            connection_status_->setStyleSheet(
-                (connected || ros_node_->isSimConnected()) ? 
+            connection_status_->setText(connected ? "Connected" : "Disconnected");
+            connection_status_->setStyleSheet(connected ? 
                 QString("color: %1;").arg(SUCCESS_COLOR) : 
                 QString("color: %1;").arg(DANGER_COLOR)); }, Qt::QueuedConnection);
 
-        // Recording signals
+        // Señales de grabación
         connect(ros_node_.get(), &PropArmGuiNode::recordingStarted,
                 this, &MainWindow::onRecordingStarted, Qt::QueuedConnection);
 
@@ -59,7 +43,7 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
                 this, &MainWindow::onRecordingCompleted, Qt::QueuedConnection);
     }
 
-    setWindowTitle("PropArm Control System - Real & Simulation Overlay");
+    setWindowTitle("PropArm Control System - PWM & Duty Cycle Monitoring");
 }
 
 void MainWindow::setupUbuntuScreenGeometry()
@@ -425,30 +409,20 @@ void MainWindow::updateDisplays()
 
     PropArmData data = ros_node_->getCurrentData();
 
-    // Update UI with REAL data (if available)
-    if (data.valid)
-    {
-        arm_angle_value_->setText(QString::number(data.arm_angle_deg, 'f', 2) + " °");
-        motor_speed_value_->setText(QString::number(data.motor_speed_rad_s, 'f', 2) + " rad/s");
-        pwm_input_value_->setText(QString::number(data.pwm_input_us, 'f', 0) + " µs");
-        duty_cycle_value_->setText(QString::number(data.duty_cycle_percent, 'f', 2) + " %");
-        error_value_->setText(QString::number(data.error, 'f', 2) + " °");
-        motor_cmd_value_->setText(QString::number(data.motor_command, 'f', 2) + " rad/s");
+    if (!data.valid)
+        return;
 
-        angle_progress_->setValue(static_cast<int>(data.arm_angle_deg));
-        velocity_progress_->setValue(static_cast<int>(data.motor_speed_rad_s));
-    }
-    // If no real data but simulation data exists, show simulation data
-    else if (data.sim_valid)
-    {
-        arm_angle_value_->setText(QString::number(data.sim_arm_angle_deg, 'f', 2) + " ° (SIM)");
-        motor_speed_value_->setText(QString::number(data.sim_motor_speed_rad_s, 'f', 2) + " rad/s (SIM)");
-        pwm_input_value_->setText(QString::number(data.sim_pwm_input_us, 'f', 0) + " µs (SIM)");
-        duty_cycle_value_->setText(QString::number(data.sim_duty_cycle_percent, 'f', 2) + " % (SIM)");
+    // Update values (show REAL data in UI)
+    arm_angle_value_->setText(QString::number(data.arm_angle_deg, 'f', 2) + " °");
+    motor_speed_value_->setText(QString::number(data.motor_speed_rad_s, 'f', 2) + " rad/s");
+    pwm_input_value_->setText(QString::number(data.pwm_input_us, 'f', 0) + " µs");
+    duty_cycle_value_->setText(QString::number(data.duty_cycle_percent, 'f', 2) + " %");
+    error_value_->setText(QString::number(data.error, 'f', 2) + " °");
+    motor_cmd_value_->setText(QString::number(data.motor_command, 'f', 2) + " rad/s");
 
-        angle_progress_->setValue(static_cast<int>(data.sim_arm_angle_deg));
-        velocity_progress_->setValue(static_cast<int>(data.sim_motor_speed_rad_s));
-    }
+    // Update progress bars
+    angle_progress_->setValue(static_cast<int>(data.arm_angle_deg));
+    velocity_progress_->setValue(static_cast<int>(data.motor_speed_rad_s));
 
     // Update control mode
     control_mode_->setText("Mode: " + QString::fromStdString(ros_node_->getControlMode()));
@@ -456,14 +430,13 @@ void MainWindow::updateDisplays()
     // Update visualizer with BOTH real and simulation data
     if (data_visualizer_)
     {
-        // Always send data, even if one source is invalid (will send zeros)
         data_visualizer_->onDataReceived(
-            data.valid ? data.arm_angle_deg : 0.0,
-            data.valid ? data.motor_speed_rad_s : 0.0,
-            data.valid ? data.pwm_input_us : 0.0,
-            data.sim_valid ? data.sim_arm_angle_deg : 0.0,
-            data.sim_valid ? data.sim_motor_speed_rad_s : 0.0,
-            data.sim_valid ? data.sim_pwm_input_us : 0.0
+            data.arm_angle_deg,
+            data.motor_speed_rad_s,
+            data.pwm_input_us,
+            data.sim_arm_angle_deg,     // NEW: simulation data
+            data.sim_motor_speed_rad_s, // NEW: simulation data
+            data.sim_pwm_input_us       // NEW: simulation data
         );
     }
 }
@@ -507,7 +480,7 @@ void MainWindow::onStabilizeClicked()
     if (ros_node_)
     {
         PropArmData data = ros_node_->getCurrentData();
-        double current_angle = data.valid ? data.arm_angle_deg : data.sim_arm_angle_deg;
+        double current_angle = data.arm_angle_deg;
 
         angle_slider_->setValue(static_cast<int>(current_angle));
         ros_node_->sendAngleCommand(current_angle);
