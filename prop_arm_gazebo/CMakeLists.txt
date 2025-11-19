@@ -20,7 +20,7 @@ find_package(ament_cmake REQUIRED)
 # ---------------------- Install targets -------------------------
 
 # Install directories inside the package:
-install(DIRECTORY launch worlds urdf models
+install(DIRECTORY launch worlds urdf models config
     DESTINATION share/${PROJECT_NAME}
 )
 

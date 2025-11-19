@@ -73,7 +73,7 @@ public:
         QString units;
         QColor primary_color;
         QColor secondary_color;
-        QColor sim_color; // Color para datos de simulación
+        QColor sim_color;
         double y_min;
         double y_max;
         bool auto_scale;
@@ -83,26 +83,24 @@ public:
         bool show_milliseconds;
         bool use_smooth_curves = true;
         bool show_minor_grid = true;
+        bool show_sim_series = true;
     };
 
     explicit ChartBase(const ChartConfig &config, QWidget *parent = nullptr);
     virtual ~ChartBase();
 
-    // Data management - ahora con soporte para datos de simulación
     void addDataPoint(double value, double timestamp = -1);
-    void addSimDataPoint(double value, double timestamp = -1); // NUEVO: datos de simulación
+    void addSimDataPoint(double value, double timestamp = -1);
     void clearData();
     void setTimeWindow(double seconds);
     void setYRange(double min, double max);
     void setAutoScale(bool enabled);
 
-    // Visual configuration
     void updateTheme();
     void setGridVisible(bool visible);
     void setShowMilliseconds(bool show_ms);
     void setSmoothCurves(bool enabled);
 
-    // Updated neon color scheme
     static const QColor BACKGROUND_DARK;
     static const QColor PLOT_BACKGROUND;
     static const QColor GRID_PRIMARY;
@@ -133,7 +131,7 @@ protected:
     void setupAdvancedGrid();
     void updateSeriesOptimized();
     void updateSplineSeries();
-    void updateSimSeries(); // NUEVO: actualizar serie de simulación
+    void updateSimSeries();
 
     void initializeMemoryPool();
     void initializeWithOptimizedData();
@@ -157,14 +155,12 @@ protected:
     ChartConfig config_;
     double start_time_;
 
-    // Chart components
     QChart *chart_;
     HoverChartView *chart_view_;
     QLineSeries *main_series_;
     QSplineSeries *trend_series_;
     QSplineSeries *smooth_series_;
 
-    // NUEVO: Series para datos de simulación
     QLineSeries *sim_main_series_;
     QSplineSeries *sim_smooth_series_;
 
@@ -174,16 +170,14 @@ protected:
     std::vector<QGraphicsLineItem *> minor_grid_lines_x_;
     std::vector<QGraphicsLineItem *> minor_grid_lines_y_;
 
-    // Data storage
     std::deque<DataPoint> data_points_;
-    std::deque<DataPoint> sim_data_points_; // NUEVO: datos de simulación
+    std::deque<DataPoint> sim_data_points_;
     QMutex *data_mutex_;
 
-    // Pre-allocated memory pools
     QVector<QPointF> series_points_buffer_;
     QVector<QPointF> spline_points_buffer_;
-    QVector<QPointF> sim_series_points_buffer_; // NUEVO: buffer para simulación
-    QVector<QPointF> sim_spline_points_buffer_; // NUEVO
+    QVector<QPointF> sim_series_points_buffer_;
+    QVector<QPointF> sim_spline_points_buffer_;
     std::array<DataPoint, 2000> data_pool_;
     size_t pool_write_index_;
     size_t optimal_buffer_size_;

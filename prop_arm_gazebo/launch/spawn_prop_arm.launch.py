@@ -57,62 +57,62 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(gazebo_launch),
             launch_arguments={'use_sim_time': use_sim_time}.items()
         ),
-
-        # 2. Publish URDF:
+        
+        # 2. Launch PropArm GUI with fixed delay:
         TimerAction(
-            period=1.0,
+            period=1.0, 
+            actions=[ IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(gui_launch),
+                launch_arguments={
+                    'use_sim_time': use_sim_time,
+                    'log_level': 'info'
+                }.items()
+            ) ],
+            condition=IfCondition(launch_gui)
+        ),
+
+        # 3. Publish URDF:
+        TimerAction(
+            period=3.0,
             actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(urdf_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
             ) ]
         ),
 
-        # 3. Spawn the robot in Gazebo:
+        # 4. Spawn the robot in Gazebo:
         TimerAction(
-            period=3.0,
+            period=5.0,
             actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(spawn_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
             ) ]
         ),
         
-        #4. Spawn object models in Gazebo:
+        #5. Spawn object models in Gazebo:
         TimerAction(
-            period=4.0,
+            period=7.0,
             actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(spawn_models_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
             ) ]
         ),
 
-        # 5. Load gazebo controllers:
+        # 6. Load gazebo controllers:
         TimerAction(
-            period=6.0,
+            period=9.0,
             actions=[ IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(controller_launch),
                 launch_arguments={'use_sim_time': use_sim_time}.items()
             ) ]
         ),
         
-        # 6. Load PID controller node:
-        # TimerAction(
-        #     period=20.0,
-        #     actions=[ IncludeLaunchDescription(
-        #         PythonLaunchDescriptionSource(pid_controller_launch),
-        #         launch_arguments={'use_sim_time': use_sim_time}.items()
-        #     ) ]
-        # ),
-
-        # 7. Launch PropArm GUI with fixed delay:
-        # TimerAction(
-        #     period=8.0, 
-        #     actions=[ IncludeLaunchDescription(
-        #         PythonLaunchDescriptionSource(gui_launch),
-        #         launch_arguments={
-        #             'use_sim_time': use_sim_time,
-        #             'log_level': 'info'
-        #         }.items()
-        #     ) ],
-        #     condition=IfCondition(launch_gui)
-        # ),
+        # 7. Load PID controller node:
+        TimerAction(
+            period=11.0,
+            actions=[ IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(pid_controller_launch),
+                launch_arguments={'use_sim_time': use_sim_time}.items()
+            ) ]
+        ),
     ])

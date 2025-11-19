@@ -1,17 +1,52 @@
 prop_arm_pid_controller:
   ros__parameters:
+    # Enable automatic control mode at startup
+    auto_mode_enabled: false
+
+    # Sampling time
     Ts: 0.01
+
+    # Fallback reference in deg (used if no ref topic is published)
     ref_deg: 0.0
+
+    # PWM limits [us]:
     pwm_min: 1000.0
     pwm_max: 2000.0
-    pwm_idle_us: 1182.0
-    kff_pwm_per_sin: 176.0
+
+    # Gravity feedforward:
+    pwm_idle_us: 1178.0 # ~u_idle
+    kff_pwm_per_sin: 185.0 # ~delta PWM between 0 and 90 deg
     enable_ff: true
+
+    # Topics
     angle_topic: "/arm_sim/angle_rad"
     pwm_topic: "/arm_sim/esc/pwm_us"
     ref_angle_topic: "/arm_sim/ref_angle_rad"
-    pid.p: 0.1
-    pid.i: 1.5
-    pid.d: 0.15
+    auto_mode_topic: "/arm_sim/esc/auto_mode"
+
+    # Base PID (fallback, no scheduling)
+    pid.p: 0.10
+    pid.i: 0.80
+    pid.d: 0.08
     pid.i_clamp: 100.0
     pid.sample_time: 0.01
+
+    # Scheduling centers [deg]:
+    angle_low_center_deg: 15.0
+    angle_mid_center_deg: 45.0
+    angle_high_center_deg: 75.0
+
+    # --------- LOW REGION PID (around 15 deg, covers ~0–30 deg) ---------
+    pid_low.p: 0.10
+    pid_low.i: 0.80
+    pid_low.d: 0.08
+
+    # --------- MID REGION PID (around 45 deg, covers ~30–60 deg) --------
+    pid_mid.p: 0.08
+    pid_mid.i: 0.60
+    pid_mid.d: 0.06
+
+    # --------- HIGH REGION PID (around 75 deg, covers ~60–85 deg) -------
+    pid_high.p: 0.06
+    pid_high.i: 0.40
+    pid_high.d: 0.05

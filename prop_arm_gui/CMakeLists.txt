@@ -37,7 +37,7 @@ include_directories(include)
 # ------------------ Set sources and headers --------------------
 
 set(GUI_SOURCES
-    src/main.cpp
+    src/main_window.cpp
     src/prop_arm_gui_node.cpp
     src/chart_base.cpp
     src/data_exporter.cpp
@@ -45,6 +45,7 @@ set(GUI_SOURCES
     src/aerospace_data_visualizer.cpp
     src/real_time_plot.cpp
     src/data_exporter.cpp
+    src/export_preview_dialog.cpp
 )
 
 set(GUI_HEADERS
@@ -55,6 +56,7 @@ set(GUI_HEADERS
     include/prop_arm_gui/data_recorder.hpp 
     include/prop_arm_gui/aerospace_data_visualizer.hpp
     include/prop_arm_gui/real_time_plot.hpp
+    include/prop_arm_gui/export_preview_dialog.hpp
 )
 
 # --------------------- Build executables ------------------------

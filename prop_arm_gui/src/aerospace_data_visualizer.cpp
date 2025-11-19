@@ -226,25 +226,11 @@ void AerospaceDataVisualizer::createCharts()
 
         auto chart = std::make_unique<ChartBase>(config);
 
-        // Layout para 4 gráficas en 2x2:
-        // Row 0: ARM ANGLE (0,0), MOTOR VELOCITY (0,1)
-        // Row 1: PWM INPUT (1,0), DUTY CYCLE (1,1)
         int row = static_cast<int>(i / 2);
         int col = static_cast<int>(i % 2);
 
         main_layout_->addWidget(chart.get(), row, col);
         charts_.push_back(std::move(chart));
-    }
-
-    if (ros_node_)
-    {
-        RCLCPP_INFO(ros_node_->get_logger(),
-                    "Created %zu charts in 2x2 layout with real + simulation overlay:",
-                    charts_.size());
-        RCLCPP_INFO(ros_node_->get_logger(), "  - Angle: FIXED [0, 180] degrees");
-        RCLCPP_INFO(ros_node_->get_logger(), "  - Velocity: FIXED [-800, 800] rad/s");
-        RCLCPP_INFO(ros_node_->get_logger(), "  - PWM Input: AUTO-SCALE");
-        RCLCPP_INFO(ros_node_->get_logger(), "  - Duty Cycle: AUTO-SCALE");
     }
 }
 

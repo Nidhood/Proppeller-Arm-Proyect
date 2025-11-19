@@ -1,122 +1,143 @@
 #pragma once
 
-#include <QMainWindow>
+#include <QCheckBox>
+#include <QDoubleSpinBox>
 #include <QGridLayout>
-#include <QVBoxLayout>
+#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMainWindow>
+#include <QMutex>
+#include <QProgressBar>
 #include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
-#include <QDoubleSpinBox>
-#include <QGroupBox>
+#include <QStatusBar>
 #include <QTabWidget>
 #include <QTimer>
-#include <QProgressBar>
-#include <QFrame>
-#include <QFont>
-#include <QPalette>
-#include <QScreen>
-#include <QGuiApplication>
-#include <QMetaObject>
-#include <QThread>
-#include <QStatusBar>
-#include <QFileDialog>
-#include <QMessageBox>
-#include <QCheckBox>
+#include <QVBoxLayout>
+#include <QWidget>
+#include <deque>
 #include <memory>
-#include <future>
 
-#include "prop_arm_gui/prop_arm_gui_node.hpp"
-#include "prop_arm_gui/data_exporter.hpp"
+#include "prop_arm_gui/aerospace_data_visualizer.hpp"
 #include "prop_arm_gui/chart_base.hpp"
+#include "prop_arm_gui/prop_arm_gui_node.hpp"
 
-class AerospaceDataVisualizer;
+// Estructura para almacenar datos de control
+struct ControlData {
+  double timestamp;
+  double arm_angle_deg;
+  double ref_angle_deg;
+  double error_deg;
+  double motor_speed_rad_s;
+  double pwm_input_us;
+  double sim_arm_angle_deg;
+  double sim_motor_speed_rad_s;
+  double sim_pwm_input_us;
+};
 
-class MainWindow : public QMainWindow
-{
-    Q_OBJECT
+class MainWindow : public QMainWindow {
+  Q_OBJECT
 
 public:
-    explicit MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent = nullptr);
-    ~MainWindow() = default;
+  explicit MainWindow(std::shared_ptr<PropArmGuiNode> node,
+                      QWidget *parent = nullptr);
+  ~MainWindow();
 
 private slots:
-    void updateDisplays();
-    void onAngleSliderChanged(int value);
-    void onPWMSliderChanged(int value);
-    void onAutoModeToggled(bool checked);
-    void onStopClicked();
-    void onStabilizeClicked();
-    void onRefreshClicked();
-    void onExportDataClicked();
-    void onStartRecordingClicked();
-    void onStopRecordingClicked();
-    void onRecordingStarted(double duration);
-    void onRecordingProgress(double remaining_time, size_t point_count);
-    void onRecordingCompleted(size_t point_count, double duration);
-    void onStartStepTestClicked();
-    void onStopStepTestClicked();
+  void updateDisplays();
+  void onAngleSliderChanged(int value);
+  void onPWMSliderChanged(int value);
+  void onAutoModeToggled(bool checked);
+  void onStopClicked();
+  void onStabilizeClicked();
+  void onRefreshClicked();
+  void onExportDataClicked();
+  void onStartRecordingClicked();
+  void onStopRecordingClicked();
+  void onRecordingStarted(double duration);
+  void onRecordingProgress(double remaining_time, size_t point_count);
+  void onRecordingCompleted(size_t point_count, double duration);
+  void onStartStepTestClicked();
+  void onStopStepTestClicked();
 
 private:
-    void setupUI();
-    void setupStyles();
-    void setupUbuntuScreenGeometry();
-    void setupControlTab();
-    void setupControlPanel();
-    void setupControlCharts();
-    void createStatusBar();
+  void setupUbuntuScreenGeometry();
+  void setupUI();
+  void setupControlTab();
+  void setupControlPanel();
+  void setupControlCharts();
+  void createStatusBar();
+  void setupStyles();
 
-    std::shared_ptr<PropArmGuiNode> ros_node_;
-    QTimer *update_timer_;
+  // Métodos para manejo de datos
+  void storeControlData(const ControlData &data);
+  void clearControlData();
+  void updateChartsWithData(const ControlData &data);
 
-    QWidget *central_widget_;
-    QTabWidget *tab_widget_;
+  std::shared_ptr<PropArmGuiNode> ros_node_;
 
-    QWidget *control_widget_;
-    AerospaceDataVisualizer *data_visualizer_;
+  // Almacenamiento de datos de control
+  std::deque<ControlData> control_data_;
+  QMutex *control_data_mutex_;
+  static constexpr size_t MAX_CONTROL_POINTS = 1000;
 
-    QGroupBox *control_group_;
+  // UI Components
+  QWidget *central_widget_;
+  QTabWidget *tab_widget_;
+  QWidget *control_widget_;
+  QGroupBox *control_group_;
+  AerospaceDataVisualizer *data_visualizer_;
 
-    QSlider *angle_slider_;
-    QSlider *pwm_slider_;
-    QDoubleSpinBox *angle_spinbox_;
-    QSpinBox *pwm_spinbox_;
-    QCheckBox *auto_mode_checkbox_;
-    QPushButton *stop_btn_;
-    QPushButton *stabilize_btn_;
-    QPushButton *refresh_btn_;
-    QPushButton *export_btn_;
+  // Control Charts
+  ChartBase *angle_vs_reference_chart_;
+  ChartBase *error_chart_;
 
-    QDoubleSpinBox *step_angle_low_spinbox_;
-    QDoubleSpinBox *step_angle_high_spinbox_;
-    QDoubleSpinBox *step_time_up_spinbox_;
-    QDoubleSpinBox *step_time_down_spinbox_;
-    QPushButton *start_step_test_btn_;
-    QPushButton *stop_step_test_btn_;
+  // Control Inputs
+  QCheckBox *auto_mode_checkbox_;
+  QSlider *angle_slider_;
+  QDoubleSpinBox *angle_spinbox_;
+  QSlider *pwm_slider_;
+  QSpinBox *pwm_spinbox_;
 
-    QDoubleSpinBox *recording_duration_spinbox_;
-    QPushButton *start_recording_btn_;
-    QPushButton *stop_recording_btn_;
-    QLabel *recording_status_label_;
-    QProgressBar *recording_progress_bar_;
+  // Step Test Controls
+  QDoubleSpinBox *step_angle_low_spinbox_;
+  QDoubleSpinBox *step_angle_high_spinbox_;
+  QDoubleSpinBox *step_time_up_spinbox_;
+  QDoubleSpinBox *step_time_down_spinbox_;
+  QPushButton *start_step_test_btn_;
+  QPushButton *stop_step_test_btn_;
 
-    // NUEVAS GRÁFICAS PARA LA VENTANA DE CONTROL
-    ChartBase *angle_vs_reference_chart_;
-    ChartBase *error_chart_;
-    ChartBase *motor_velocity_chart_;
+  // Recording Controls
+  QDoubleSpinBox *recording_duration_spinbox_;
+  QPushButton *start_recording_btn_;
+  QPushButton *stop_recording_btn_;
+  QLabel *recording_status_label_;
+  QProgressBar *recording_progress_bar_;
 
-    QLabel *connection_status_;
-    QLabel *control_mode_;
-    QLabel *system_status_;
+  // Action Buttons
+  QPushButton *stop_btn_;
+  QPushButton *stabilize_btn_;
+  QPushButton *refresh_btn_;
+  QPushButton *export_btn_;
 
-    const QString PRIMARY_COLOR = "#1a365d";
-    const QString SECONDARY_COLOR = "#2563eb";
-    const QString SUCCESS_COLOR = "#00ff88";
-    const QString WARNING_COLOR = "#ff8c00";
-    const QString DANGER_COLOR = "#ff3366";
-    const QString BACKGROUND_COLOR = "#080a0f";
-    const QString CARD_COLOR = "#1e293b";
-    const QString TEXT_COLOR = "#e2e8f0";
-    const QString ACCENT_COLOR = "#00ccff";
+  // Status Bar
+  QLabel *connection_status_;
+  QLabel *control_mode_;
+  QLabel *system_status_;
+
+  // Update Timer
+  QTimer *update_timer_;
+
+  // Modern Dark Theme Colors
+  const QString BACKGROUND_COLOR = "#0a0e27";
+  const QString CARD_COLOR = "#1a1f3a";
+  const QString PRIMARY_COLOR = "#2d3250";
+  const QString SECONDARY_COLOR = "#424769";
+  const QString TEXT_COLOR = "#e4e4e7";
+  const QString ACCENT_COLOR = "#7dd3fc";
+  const QString SUCCESS_COLOR = "#4ade80";
+  const QString WARNING_COLOR = "#fbbf24";
+  const QString DANGER_COLOR = "#f87171";
 };

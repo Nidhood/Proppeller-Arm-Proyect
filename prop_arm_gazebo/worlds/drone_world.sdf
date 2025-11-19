@@ -1,23 +1,25 @@
 <?xml version="1.0" ?>
 <sdf version="1.8">
   <world name="drone_world">
-    <!-- Physics -->
+
+    <!-- Server physics configuration -->
     <physics name="1ms" type="ignored">
       <max_step_size>0.01</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
 
-    <!-- Plugins -->
-    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"></plugin>
-    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"></plugin>
-    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"></plugin>
-    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"></plugin>
+    <!-- Core simulation systems (server-side plugins) -->
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
     <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <!-- Force Ogre2 rendering for sensors -->
       <render_engine>ogre2</render_engine>
     </plugin>
-    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"></plugin>
+    <plugin filename="gz-sim-imu-system" name="gz::sim::systems::Imu"/>
 
-    <!-- Enhanced Wind/Air Flow Plugin -->
+    <!-- Wind / air flow system -->
     <plugin filename="gz-sim-wind-effects-system" name="gz::sim::systems::WindEffects">
       <horizontal>
         <magnitude>
@@ -51,7 +53,7 @@
       </vertical>
     </plugin>
 
-    <!-- Dark Theme Scene Configuration -->
+    <!-- Scene lighting and background (world, not GUI) -->
     <scene>
       <ambient>0.3 0.3 0.3 1</ambient>
       <background>0.02 0.02 0.02 1</background>
@@ -59,36 +61,74 @@
       <grid>false</grid>
     </scene>
 
-    <!-- GUI Configuration -->
+    <!-- GUI layout for Harmonic (client-side plugins) -->
     <gui fullscreen="0">
 
-      <!-- Window configuration with Black theme -->
+      <!-- Main window and Material style configuration -->
       <window>
+        <position_x>-1</position_x>
+        <position_y>-1</position_y>
+        <state></state>
         <width>1920</width>
-        <height>1080</height>
-        <style material_theme="Dark" material_primary="BlueGrey" material_accent="Teal"/>
+        <height>945</height>
+        <style material_theme="Light" material_primary="#607d8b" material_accent="#9e9e9e" toolbar_color_light="" toolbar_text_color_light="" toolbar_color_dark="" toolbar_text_color_dark="" plugin_toolbar_color_light="" plugin_toolbar_text_color_light="" plugin_toolbar_color_dark="" plugin_toolbar_text_color_dark=""/>
+        <menus>
+          <drawer visible="true" default="true"/>
+          <plugins visible="true" from_paths="true"/>
+        </menus>
       </window>
 
-      <!-- 3D View with updated camera pose -->
-      <plugin filename="GzScene3D" name="3D View">
+      <!-- Main 3D view (MinimalScene) -->
+      <plugin filename="MinimalScene" name="3D View">
         <gz-gui>
           <title>3D View</title>
           <property type="bool" key="showTitleBar">false</property>
           <property type="string" key="state">docked</property>
         </gz-gui>
+
+        <!-- Render engine and scene name -->
         <engine>ogre2</engine>
         <scene>scene</scene>
+
+        <!-- Visual tuning for the 3D view -->
         <ambient_light>0.3 0.3 0.3</ambient_light>
         <background_color>0.02 0.02 0.02</background_color>
-        <camera_pose>1.163896 0.100641 1.480959 0 0.245797 0.023627</camera_pose>
+
+        <!-- Initial camera pose: x y z roll pitch yaw (radians) -->
+        <camera_pose>1.512619 0.416925 1.622423 -0.000001 0.554002 -2.663785</camera_pose>
+
+        <!-- View controller: orbit or ortho (used by InteractiveViewControl) -->
+        <view_controller>orbit</view_controller>
+
         <camera_clip>
           <near>0.1</near>
           <far>1000</far>
         </camera_clip>
-        <show_transform_controls>false</show_transform_controls>
       </plugin>
 
-      <!-- Component Inspector - Collapsed -->
+      <!-- Interactive view control (enables mouse camera control) -->
+      <plugin filename="InteractiveViewControl" name="Interactive view control">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <!-- Scene manager (helper for MinimalScene, kept hidden) -->
+      <plugin filename="GzSceneManager" name="Scene Manager">
+        <gz-gui>
+          <property key="resizable" type="bool">false</property>
+          <property key="width" type="double">5</property>
+          <property key="height" type="double">5</property>
+          <property key="state" type="string">floating</property>
+          <property key="showTitleBar" type="bool">false</property>
+        </gz-gui>
+      </plugin>
+
+      <!-- Component Inspector panel (collapsed by default) -->
       <plugin filename="ComponentInspector" name="Component Inspector">
         <gz-gui>
           <title>Component Inspector</title>
@@ -97,7 +137,7 @@
         </gz-gui>
       </plugin>
 
-      <!-- Entity Tree - Collapsed -->
+      <!-- Entity Tree panel (collapsed by default) -->
       <plugin filename="EntityTree" name="Entity Tree">
         <gz-gui>
           <title>Entity Tree</title>
@@ -106,16 +146,22 @@
         </gz-gui>
       </plugin>
 
-      <!-- Mouse drag - Collapsed -->
-      <plugin filename="Select" name="Mouse drag">
+      <!-- Mouse drag tool (collapsed by default) -->
+      <plugin filename="MouseDrag" name="Mouse drag">
         <gz-gui>
           <title>Mouse drag</title>
           <property type="bool" key="showTitleBar">true</property>
           <property type="string" key="state">docked_collapsed</property>
         </gz-gui>
+
+        <!-- Optional stiffness parameters for mouse constraints -->
+        <rotation_stiffness>100.0</rotation_stiffness>
+        <position_stiffness>100.0</position_stiffness>
       </plugin>
+
     </gui>
 
+    <!-- World coordinates -->
     <spherical_coordinates>
       <surface_model>EARTH_WGS84</surface_model>
       <world_frame_orientation>ENU</world_frame_orientation>
@@ -125,7 +171,7 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
 
-    <!-- Key Light -->
+    <!-- Key light for the scene -->
     <light type="point" name="key_light">
       <pose>3 10 15 0 0 0</pose>
       <diffuse>0.9 0.9 0.95 1</diffuse>
@@ -139,7 +185,7 @@
       <cast_shadows>true</cast_shadows>
     </light>
 
-    <!-- Black Reflective Ground Plane -->
+    <!-- Black reflective ground plane -->
     <model name="ground_plane">
       <static>true</static>
       <link name="link">
@@ -182,9 +228,10 @@
       </link>
     </model>
 
-    <!-- Stronger constant breeze -->
+    <!-- Constant breeze -->
     <wind>
       <linear_velocity>0.8 0.5 0.1</linear_velocity>
     </wind>
+
   </world>
 </sdf>
