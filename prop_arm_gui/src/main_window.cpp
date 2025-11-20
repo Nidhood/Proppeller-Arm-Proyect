@@ -13,7 +13,8 @@
 
 MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
     : QMainWindow(parent), ros_node_(node), control_data_mutex_(new QMutex()),
-      angle_vs_reference_chart_(nullptr), error_chart_(nullptr) {
+      angle_vs_reference_chart_(nullptr), error_chart_(nullptr)
+{
   setupUbuntuScreenGeometry();
   setupUI();
   setupStyles();
@@ -23,13 +24,15 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
   connect(update_timer_, &QTimer::timeout, this, &MainWindow::updateDisplays);
   update_timer_->start();
 
-  if (ros_node_) {
+  if (ros_node_)
+  {
     connect(ros_node_.get(), &PropArmGuiNode::dataUpdated, this,
             &MainWindow::updateDisplays, Qt::QueuedConnection);
 
     connect(
         ros_node_.get(), &PropArmGuiNode::connectionChanged, this,
-        [this](bool connected) {
+        [this](bool connected)
+        {
           connection_status_->setText(connected ? "Connected" : "Disconnected");
           connection_status_->setStyleSheet(
               connected ? QString("color: %1;").arg(SUCCESS_COLOR)
@@ -50,16 +53,20 @@ MainWindow::MainWindow(std::shared_ptr<PropArmGuiNode> node, QWidget *parent)
   setWindowTitle("PropArm Control System - Enhanced Control Panel");
 }
 
-MainWindow::~MainWindow() {
-  if (update_timer_) {
+MainWindow::~MainWindow()
+{
+  if (update_timer_)
+  {
     update_timer_->stop();
   }
   delete control_data_mutex_;
 }
 
-void MainWindow::setupUbuntuScreenGeometry() {
+void MainWindow::setupUbuntuScreenGeometry()
+{
   QScreen *screen = QGuiApplication::primaryScreen();
-  if (screen) {
+  if (screen)
+  {
     QRect screenGeometry = screen->geometry();
     int width = static_cast<int>(screenGeometry.width() * 0.95);
     int height = static_cast<int>(screenGeometry.height() * 0.90);
@@ -68,12 +75,15 @@ void MainWindow::setupUbuntuScreenGeometry() {
     int x = (screenGeometry.width() - width) / 2;
     int y = (screenGeometry.height() - height) / 2;
     move(x, y);
-  } else {
+  }
+  else
+  {
     resize(1600, 900);
   }
 }
 
-void MainWindow::setupUI() {
+void MainWindow::setupUI()
+{
   central_widget_ = new QWidget(this);
   setCentralWidget(central_widget_);
 
@@ -94,7 +104,8 @@ void MainWindow::setupUI() {
   createStatusBar();
 }
 
-void MainWindow::setupControlTab() {
+void MainWindow::setupControlTab()
+{
   control_widget_ = new QWidget();
 
   QHBoxLayout *main_horizontal_layout = new QHBoxLayout(control_widget_);
@@ -119,7 +130,8 @@ void MainWindow::setupControlTab() {
   tab_widget_->addTab(control_widget_, "Control Panel");
 }
 
-void MainWindow::setupControlPanel() {
+void MainWindow::setupControlPanel()
+{
   control_group_ = new QGroupBox("Control Commands");
   QVBoxLayout *control_group_layout = new QVBoxLayout(control_group_);
   control_group_layout->setSpacing(10);
@@ -343,14 +355,17 @@ void MainWindow::setupControlPanel() {
           &MainWindow::onStopStepTestClicked);
 
   connect(angle_spinbox_, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-          [this](double value) {
+          [this](double value)
+          {
             angle_slider_->setValue(static_cast<int>(value));
           });
   connect(pwm_spinbox_, QOverload<int>::of(&QSpinBox::valueChanged),
-          [this](int value) { pwm_slider_->setValue(value); });
+          [this](int value)
+          { pwm_slider_->setValue(value); });
 }
 
-void MainWindow::setupControlCharts() {
+void MainWindow::setupControlCharts()
+{
   ChartBase::ChartConfig angle_config;
   angle_config.title = "ANGLE: Real vs Reference";
   angle_config.y_label = "Angle";
@@ -394,7 +409,8 @@ void MainWindow::setupControlCharts() {
   error_chart_->setMinimumHeight(300);
 }
 
-void MainWindow::createStatusBar() {
+void MainWindow::createStatusBar()
+{
   QStatusBar *status = statusBar();
 
   connection_status_ = new QLabel("Disconnected");
@@ -414,7 +430,8 @@ void MainWindow::createStatusBar() {
   status->addPermanentWidget(system_status_);
 }
 
-void MainWindow::setupStyles() {
+void MainWindow::setupStyles()
+{
   QString stylesheet = QString(R"(
         QMainWindow {
             background-color: %1;
@@ -503,34 +520,41 @@ void MainWindow::setupStyles() {
   setStyleSheet(stylesheet);
 }
 
-void MainWindow::storeControlData(const ControlData &data) {
+void MainWindow::storeControlData(const ControlData &data)
+{
   QMutexLocker locker(control_data_mutex_);
 
   control_data_.push_back(data);
 
-  while (control_data_.size() > MAX_CONTROL_POINTS) {
+  while (control_data_.size() > MAX_CONTROL_POINTS)
+  {
     control_data_.pop_front();
   }
 }
 
-void MainWindow::clearControlData() {
+void MainWindow::clearControlData()
+{
   QMutexLocker locker(control_data_mutex_);
   control_data_.clear();
 }
 
-void MainWindow::updateChartsWithData(const ControlData &data) {
-  if (angle_vs_reference_chart_) {
+void MainWindow::updateChartsWithData(const ControlData &data)
+{
+  if (angle_vs_reference_chart_)
+  {
     angle_vs_reference_chart_->addDataPoint(data.arm_angle_deg, data.timestamp);
     angle_vs_reference_chart_->addSimDataPoint(data.ref_angle_deg,
                                                data.timestamp);
   }
 
-  if (error_chart_) {
+  if (error_chart_)
+  {
     error_chart_->addDataPoint(data.error_deg, data.timestamp);
   }
 }
 
-void MainWindow::updateDisplays() {
+void MainWindow::updateDisplays()
+{
   if (!ros_node_)
     return;
 
@@ -558,7 +582,8 @@ void MainWindow::updateDisplays() {
   storeControlData(ctrl_data);
   updateChartsWithData(ctrl_data);
 
-  if (data_visualizer_) {
+  if (data_visualizer_)
+  {
     data_visualizer_->onDataReceived(data.arm_angle_deg, data.motor_speed_rad_s,
                                      data.pwm_input_us, data.sim_arm_angle_deg,
                                      data.sim_motor_speed_rad_s,
@@ -566,25 +591,40 @@ void MainWindow::updateDisplays() {
   }
 }
 
-void MainWindow::onAngleSliderChanged(int value) {
+void MainWindow::onAngleSliderChanged(int value)
+{
   angle_spinbox_->setValue(static_cast<double>(value));
 
-  if (ros_node_ && !auto_mode_checkbox_->isChecked()) {
+  if (ros_node_ && !auto_mode_checkbox_->isChecked())
+  {
     double angle_rad = static_cast<double>(value) * M_PI / 180.0;
     ros_node_->sendAngleCommand(angle_rad);
   }
 }
 
-void MainWindow::onPWMSliderChanged(int value) {
+void MainWindow::onPWMSliderChanged(int value)
+{
   pwm_spinbox_->setValue(value);
 
-  if (ros_node_ && !auto_mode_checkbox_->isChecked()) {
+  if (ros_node_ && !auto_mode_checkbox_->isChecked())
+  {
     ros_node_->sendPWMCommand(static_cast<uint16_t>(value));
   }
 }
 
-void MainWindow::onAutoModeToggled(bool checked) {
-  if (ros_node_) {
+void MainWindow::onAutoModeToggled(bool checked)
+{
+  if (ros_node_)
+  {
+    if (!checked)
+    {
+      PropArmData data = ros_node_->getCurrentData();
+      int current_pwm = static_cast<int>(data.pwm_input_us);
+
+      pwm_slider_->setValue(current_pwm);
+      pwm_spinbox_->setValue(current_pwm);
+    }
+
     ros_node_->sendAutoModeCommand(checked);
   }
 
@@ -600,8 +640,10 @@ void MainWindow::onAutoModeToggled(bool checked) {
           .arg(checked ? SUCCESS_COLOR : WARNING_COLOR));
 }
 
-void MainWindow::onStopClicked() {
-  if (ros_node_) {
+void MainWindow::onStopClicked()
+{
+  if (ros_node_)
+  {
     ros_node_->sendStopCommand();
     ros_node_->stopStepTest();
   }
@@ -616,8 +658,10 @@ void MainWindow::onStopClicked() {
       QString("color: %1; font-weight: bold;").arg(DANGER_COLOR));
 }
 
-void MainWindow::onStabilizeClicked() {
-  if (ros_node_) {
+void MainWindow::onStabilizeClicked()
+{
+  if (ros_node_)
+  {
     PropArmData data = ros_node_->getCurrentData();
     double current_angle = data.arm_angle_deg;
     double current_angle_rad = current_angle * M_PI / 180.0;
@@ -631,17 +675,20 @@ void MainWindow::onStabilizeClicked() {
       QString("color: %1; font-weight: bold;").arg(WARNING_COLOR));
 }
 
-void MainWindow::onRefreshClicked() {
+void MainWindow::onRefreshClicked()
+{
   if (!ros_node_)
     return;
 
   size_t recorded_count = ros_node_->getRecordedPointCount();
 
-  if (recorded_count == 0) {
+  if (recorded_count == 0)
+  {
     return;
   }
 
-  if (ros_node_->isRecording()) {
+  if (ros_node_->isRecording())
+  {
     ros_node_->stopRecording();
   }
 
@@ -665,12 +712,14 @@ void MainWindow::onRefreshClicked() {
       QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
 }
 
-void MainWindow::onExportDataClicked() {
+void MainWindow::onExportDataClicked()
+{
   if (!ros_node_)
     return;
 
   size_t point_count = ros_node_->getRecordedPointCount();
-  if (point_count == 0) {
+  if (point_count == 0)
+  {
     QMessageBox::warning(this, "No Data",
                          "No recorded data available to export.");
     return;
@@ -681,11 +730,13 @@ void MainWindow::onExportDataClicked() {
   ExportPreviewDialog preview_dialog(recorded_data, this);
 
   if (preview_dialog.exec() == QDialog::Accepted &&
-      preview_dialog.wasAccepted()) {
+      preview_dialog.wasAccepted())
+  {
     std::vector<std::string> selected_columns =
         preview_dialog.getSelectedColumns();
 
-    if (selected_columns.empty()) {
+    if (selected_columns.empty())
+    {
       QMessageBox::warning(this, "No Columns Selected",
                            "Please select at least one column to export.");
       return;
@@ -706,7 +757,8 @@ void MainWindow::onExportDataClicked() {
     double sim_start = ros_node_->getSimulationStartTime();
 
     if (exporter.exportToCSV(filename, recorded_data, sim_start,
-                             selected_columns)) {
+                             selected_columns))
+    {
       QMessageBox::information(
           this, "Export Complete",
           QString(
@@ -714,7 +766,9 @@ void MainWindow::onExportDataClicked() {
               .arg(point_count)
               .arg(selected_columns.size())
               .arg(filename));
-    } else {
+    }
+    else
+    {
       QMessageBox::critical(
           this, "Export Failed",
           QString("Failed to export data:\n%1").arg(exporter.getLastError()));
@@ -722,7 +776,8 @@ void MainWindow::onExportDataClicked() {
   }
 }
 
-void MainWindow::onStartRecordingClicked() {
+void MainWindow::onStartRecordingClicked()
+{
   if (!ros_node_)
     return;
 
@@ -730,14 +785,16 @@ void MainWindow::onStartRecordingClicked() {
   ros_node_->startRecording(duration);
 }
 
-void MainWindow::onStopRecordingClicked() {
+void MainWindow::onStopRecordingClicked()
+{
   if (!ros_node_)
     return;
 
   ros_node_->stopRecording();
 }
 
-void MainWindow::onRecordingStarted(double duration) {
+void MainWindow::onRecordingStarted(double duration)
+{
   recording_status_label_->setText("Recording...");
   recording_status_label_->setStyleSheet(
       QString("color: %1; font-weight: bold;").arg(DANGER_COLOR));
@@ -756,14 +813,16 @@ void MainWindow::onRecordingStarted(double duration) {
 }
 
 void MainWindow::onRecordingProgress(double remaining_time,
-                                     size_t point_count) {
+                                     size_t point_count)
+{
   recording_progress_bar_->setValue(static_cast<int>(remaining_time));
 
   recording_status_label_->setText(
       QString("Recording... %1 pts").arg(point_count));
 }
 
-void MainWindow::onRecordingCompleted(size_t point_count, double duration) {
+void MainWindow::onRecordingCompleted(size_t point_count, double duration)
+{
   recording_status_label_->setText(QString("Complete: %1 pts (%2s)")
                                        .arg(point_count)
                                        .arg(duration, 0, 'f', 1));
@@ -780,7 +839,8 @@ void MainWindow::onRecordingCompleted(size_t point_count, double duration) {
   system_status_->setStyleSheet(
       QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
 
-  if (point_count > 0) {
+  if (point_count > 0)
+  {
     QMessageBox::information(
         this, "Recording Complete",
         QString("Successfully recorded %1 data points over %2 seconds.\n\n"
@@ -790,7 +850,8 @@ void MainWindow::onRecordingCompleted(size_t point_count, double duration) {
   }
 }
 
-void MainWindow::onStartStepTestClicked() {
+void MainWindow::onStartStepTestClicked()
+{
   if (!ros_node_)
     return;
 
@@ -809,7 +870,8 @@ void MainWindow::onStartStepTestClicked() {
       QString("color: %1; font-weight: bold;").arg(SUCCESS_COLOR));
 }
 
-void MainWindow::onStopStepTestClicked() {
+void MainWindow::onStopStepTestClicked()
+{
   if (!ros_node_)
     return;
 
@@ -823,7 +885,8 @@ void MainWindow::onStopStepTestClicked() {
       QString("color: %1; font-weight: bold;").arg(WARNING_COLOR));
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
   rclcpp::init(argc, argv);
   QApplication app(argc, argv);
 
@@ -833,7 +896,8 @@ int main(int argc, char *argv[]) {
   MainWindow window(node);
   window.showMaximized();
 
-  std::thread ros_thread([&node]() { rclcpp::spin(node); });
+  std::thread ros_thread([&node]()
+                         { rclcpp::spin(node); });
 
   int result = app.exec();
 
