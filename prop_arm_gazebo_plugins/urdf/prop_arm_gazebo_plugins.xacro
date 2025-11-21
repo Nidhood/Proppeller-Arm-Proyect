@@ -11,13 +11,12 @@
             <timeConstantUp>0.0125</timeConstantUp>
             <timeConstantDown>0.0125</timeConstantDown>
             <maxRotVelocity>1178.0</maxRotVelocity>
-            <motorConstant>6.12e-06</motorConstant>
-            <momentConstant>1.224e-07</momentConstant>
+            <motorConstant>7.11e-06</motorConstant>
             <commandSubTopic>command/motor_speed</commandSubTopic>
             <actuator_number>0</actuator_number>
             <motorSpeedPubTopic>motor_speed/0</motorSpeedPubTopic>
             <rotorDragCoefficient>8.28e-05</rotorDragCoefficient>
-            <rollingMomentCoefficient>8.28e-06</rollingMomentCoefficient>
+            <rollingMomentCoefficient>1.00e-05</rollingMomentCoefficient>
             <rotorVelocitySlowdownSim>1</rotorVelocitySlowdownSim>
             <motorType>velocity</motorType>
         </plugin>

@@ -81,6 +81,7 @@ private:
   // Almacenamiento de datos de control
   std::deque<ControlData> control_data_;
   QMutex *control_data_mutex_;
+  double last_control_chart_time_;
   static constexpr size_t MAX_CONTROL_POINTS = 1000;
 
   // UI Components

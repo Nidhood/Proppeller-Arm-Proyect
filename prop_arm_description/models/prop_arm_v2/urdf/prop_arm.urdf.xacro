@@ -34,9 +34,9 @@
       </geometry>
     </collision>
     <inertial>
-      <mass value="0.402"/>
-      <inertia ixx="0.00050" ixy="-0.00000" ixz="0.00129" iyy="0.02111" iyz="-0.00000" izz="0.02133"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.19518 -0.00011 0.03646"/>
+      <mass value="0.4067"/>
+      <inertia ixx="0.00100" ixy="0.00000" ixz="0.00000" iyy="0.01086" iyz="0.00000" izz="0.01086"/>
+      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.32745 -0.00011 0.03646"/>
     </inertial>
     <visual name="arm">
       <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -55,8 +55,8 @@
       </geometry>
     </collision>
     <inertial>
-      <mass value="0.020"/>
-      <inertia ixx="0.00000043" ixy="0.00000194" ixz="0.00000000" iyy="0.00007266" iyz="-0.00000000" izz="0.00007301"/>
+      <mass value="0.0153"/>
+      <inertia ixx="0.00000033" ixy="0.00000148" ixz="0.00000000" iyy="0.00005558" iyz="-0.00000000" izz="0.00005585"/>
       <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00454"/>
     </inertial>
     <visual name="prop">
@@ -78,10 +78,11 @@
     <axis xyz="0 1 0"/>
     <origin rpy="0 -1.57080 -1.57080" xyz="0.00001 -0.00000 0.45833"/>
     <limit lower="0.16643634279943126" upper="3.1416" effort="1500.0" velocity="10.0"/>
-    <dynamics damping="0.0" friction="0.0"/>
+    <dynamics damping="0.0326233" friction="0.0"/>
     <parent link="base_link"/>
     <child link="arm_link"/>
   </joint>
+
 
   <!-- Joint between arm and propeller -->
   <joint name="prop_link_joint" type="continuous">

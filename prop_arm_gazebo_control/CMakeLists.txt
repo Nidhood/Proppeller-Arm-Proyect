@@ -53,27 +53,6 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/prop_arm_hardware_interface_plugin.xml")
     pluginlib_export_plugin_description_file(gz_ros2_control prop_arm_hardware_interface_plugin.xml)
 endif()
 
-# --------------------- Build executables ------------------------
-
-# Angle Hold State-Space Controller
-add_executable(angle_hold_ss_controller
-    src/angle_hold_ss_controller.cpp
-)
-target_compile_features(angle_hold_ss_controller PUBLIC c_std_99 cxx_std_17)
-target_include_directories(angle_hold_ss_controller PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
-ament_target_dependencies(angle_hold_ss_controller rclcpp std_msgs)
-target_link_libraries(angle_hold_ss_controller Eigen3::Eigen)
-
-# Test Input Command Node:
-add_executable(step_test_input_node src/step_test_input_node.cpp)
-ament_target_dependencies(step_test_input_node rclcpp std_msgs)
-target_include_directories(step_test_input_node PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<INSTALL_INTERFACE:include>
-)
 
 # ---------------------- Install targets -------------------------
 
@@ -84,13 +63,6 @@ install(TARGETS
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
-)
-
-# Install executables:
-install(TARGETS
-    angle_hold_ss_controller
-    step_test_input_node
-    DESTINATION lib/${PROJECT_NAME}
 )
 
 # Install directories:
