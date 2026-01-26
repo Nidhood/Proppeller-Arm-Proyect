@@ -1,0 +1,26 @@
+prop_arm_description:
+  ros__parameters:
+    links:
+      base_link:
+        mass: 2.343
+        com_xyz: [-0.00883, 0.0, 0.19143]
+        inertia: [0.24075, -0.0, 0.0, 0.23379, 0.03671, 0.01482]
+
+      arm_link:
+        mass: 0.4067
+        com_xyz: [-0.32745, -0.00011, 0.03646]
+        inertia: [0.00100, 0.0, 0.0, 0.01086, 0.0, 0.01086]
+
+      prop_link:
+        mass: 0.0153
+        com_xyz: [0.0, 0.0, 0.00454]
+        inertia: [0.00000033, 0.00000148, 0.0, 0.00005558, -0.0, 0.00005585]
+
+    joints:
+      arm_link_joint:
+        damping: 0.015
+        friction: 0.01
+        limit_lower: 0.4091592818742828
+        limit_upper: 1.5708
+        effort: 5.0
+        velocity: 20.0

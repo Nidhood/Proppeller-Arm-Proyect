@@ -1,0 +1,32 @@
+prop_arm_gui_node:
+  ros__parameters:
+    limits:
+      # Angle limits (degrees):
+      angle:
+        min: 0.0
+        max: 90.0
+
+      # Motor speed limits (rad/s):
+      motor_speed:
+        min: 0.0
+        max: 1600.0
+
+      # PWM limits (microseconds):
+      pwm:
+        min: 1000
+        max: 2000
+
+      # Duty cycle limits (percentage):
+      duty:
+        min: 5.0
+        max: 10.0
+
+      # Error between real and sim (degrees):
+      error:
+        min: 0.0
+        max: 90.0
+
+      # Error between actual angle and the ref angle (degrees):
+      error_tracking:
+        min: -90.0
+        max: 90.0

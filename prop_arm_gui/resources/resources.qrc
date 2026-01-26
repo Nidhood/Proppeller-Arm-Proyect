@@ -1,0 +1,14 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+    <qresource prefix="/">
+        <file>icons/prop_arm_icon.png</file>
+        <file>models/arm_segment.svg</file>
+        <file>models/base_segment.svg</file>
+        <file>theme/cyberpunk.qss</file>
+        <file>theme/dark.qss</file>
+        <file>theme/light.qss</file>
+        <file>theme/matlab.qss</file>
+        <file>theme/tron_ares.qss</file>
+        <file>theme/tron_evolution.qss</file>
+    </qresource>
+</RCC>

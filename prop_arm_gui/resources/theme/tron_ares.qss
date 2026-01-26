@@ -1,0 +1,219 @@
+/* Tron Ares - Red/Blue/Black (Ares Movie Aesthetic) */
+
+* {
+  font-family: "Rajdhani", "Orbitron", "Eurostile", "Inter", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+}
+
+QMainWindow, QWidget {
+  background-color: #000000;
+  color: #E0E8F0;
+}
+
+/* Panels */
+QFrame#panel {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #0A0A14, stop:1 #050508);
+  border: 2px solid #1A2838;
+  border-top: 3px solid #FF0033;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+QFrame#chartFrame {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #0F1420, stop:1 #080A10);
+  border: 2px solid #1A2838;
+  border-top: 2px solid #FF1A47;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+QFrame#valueTile {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #121828, stop:1 #0A0F18);
+  border: 2px solid #2A3A4A;
+  border-top: 3px solid #FF0033;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+/* Titles */
+QLabel#title, QLabel#panelTitle {
+  font-size: 18px;
+  font-weight: 800;
+  color: #FF3355;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  padding: 6px 10px;
+  background: rgba(255, 0, 51, 0.15);
+  border-radius: 6px;
+  border-bottom: 2px solid #FF0033;
+}
+
+QLabel#chartTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: #3399FF;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 4px 8px;
+}
+
+/* Value Tiles */
+QLabel#valueTileLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3399FF;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding-bottom: 3px;
+}
+
+QLabel#valueTileValue {
+  font-size: 36px;
+  font-weight: 800;
+  color: #FF0033;
+  letter-spacing: 1px;
+  padding: 6px 0px;
+}
+
+QLabel#valueTileUnit {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6699CC;
+  letter-spacing: 0.8px;
+}
+
+QLabel#subtitle {
+  color: #5588BB;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Buttons */
+QPushButton {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 rgba(255, 0, 51, 0.25),
+                              stop:1 rgba(255, 0, 51, 0.15));
+  border: 2px solid #3399FF;
+  border-top: 3px solid #FF0033;
+  border-radius: 10px;
+  padding: 11px 20px;
+  color: #E0E8F0;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+QPushButton:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 rgba(255, 26, 71, 0.35),
+                              stop:1 rgba(255, 0, 51, 0.25));
+  border: 2px solid #4DB3FF;
+  border-top: 3px solid #FF3355;
+  color: #FFFFFF;
+}
+
+QPushButton:pressed {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 rgba(255, 51, 85, 0.45),
+                              stop:1 rgba(255, 26, 71, 0.35));
+  border: 2px solid #FF0033;
+  padding-top: 12px;
+  padding-bottom: 10px;
+}
+
+QPushButton#secondary {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 rgba(26, 40, 56, 0.5),
+                              stop:1 rgba(18, 30, 46, 0.4));
+  border: 2px solid #2A5070;
+  border-top: 2px solid #4488BB;
+  color: #6699CC;
+}
+
+QPushButton#secondary:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 rgba(36, 50, 66, 0.6),
+                              stop:1 rgba(26, 40, 56, 0.5));
+  border: 2px solid #3399FF;
+  color: #99CCFF;
+}
+
+/* Inputs */
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+  background: #0A0F18;
+  border: 2px solid #1A2838;
+  border-top: 2px solid #FF0033;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #E0E8F0;
+  font-size: 13px;
+  selection-background-color: #FF0033;
+  selection-color: #FFFFFF;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+  border: 2px solid #3399FF;
+  border-top: 3px solid #FF3355;
+  background: #0F1420;
+}
+
+/* Charts */
+QChartView {
+  background: #000000;
+  border: 2px solid #1A2838;
+  border-top: 2px solid #FF0033;
+  border-radius: 10px;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+  background: #0A0F18;
+  width: 12px;
+  border-left: 2px solid #1A2838;
+  border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                              stop:0 #2A4A6A, stop:1 #3A5A7A);
+  border: 2px solid #3399FF;
+  border-radius: 5px;
+  min-height: 40px;
+}
+
+QScrollBar::handle:vertical:hover {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                              stop:0 #3A5A7A, stop:1 #4A6A8A);
+  border: 2px solid #4DB3FF;
+}
+
+QScrollBar:horizontal {
+  background: #0A0F18;
+  height: 12px;
+  border-top: 2px solid #1A2838;
+  border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #2A4A6A, stop:1 #3A5A7A);
+  border: 2px solid #3399FF;
+  border-radius: 5px;
+  min-width: 40px;
+}
+
+QScrollBar::handle:horizontal:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #3A5A7A, stop:1 #4A6A8A);
+  border: 2px solid #4DB3FF;
+}
+
+QScrollBar::add-line, QScrollBar::sub-line {
+  border: none;
+  background: none;
+}

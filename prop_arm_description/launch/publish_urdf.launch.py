@@ -20,6 +20,20 @@ def generate_launch_description():
         'prop_arm.urdf.xacro'
     ])
     
+    # Physic variables configuration file:
+    physics_file = PathJoinSubstitution([
+        FindPackageShare('prop_arm_description'),
+        'config',
+        'dynamics_params.yaml'
+    ])
+    
+    # Motor variables configuration file:
+    motor_config = PathJoinSubstitution([
+        FindPackageShare("prop_arm_gazebo_control"),
+        "config",
+        "motor_model.yaml",
+    ])
+    
     # robot_description to launch the prop arm model:
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
@@ -27,7 +41,11 @@ def generate_launch_description():
         name='robot_state_publisher',
         parameters=[{
             "robot_description": ParameterValue(
-                Command(['xacro ', xacro_file]),
+                Command([
+                    'xacro ', xacro_file, 
+                    ' physics_file:=', physics_file,
+                    ' motor_config:=', motor_config,
+                ]),
                 value_type=str
             )
         }]

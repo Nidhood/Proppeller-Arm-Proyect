@@ -36,7 +36,7 @@ def generate_launch_description():
     pkg_desc = FindPackageShare("prop_arm_description")
     pkg_ctrl = FindPackageShare("prop_arm_gazebo_control")
     pkg_pid_ctrl = FindPackageShare("prop_arm_control")
-    pkg_gui  = FindPackageShare("prop_arm_gui")
+    pkg_gui  = FindPackageShare("prop_arm_gui_old")
 
     # Launch files:
     gazebo_launch     = PathJoinSubstitution([pkg_gz,   "launch", "start_world.launch.py"])
@@ -59,17 +59,17 @@ def generate_launch_description():
         ),
         
         # 2. Launch PropArm GUI with fixed delay:
-        TimerAction(
-            period=1.0, 
-            actions=[ IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(gui_launch),
-                launch_arguments={
-                    'use_sim_time': use_sim_time,
-                    'log_level': 'info'
-                }.items()
-            ) ],
-            condition=IfCondition(launch_gui)
-        ),
+        # TimerAction(
+        #     period=1.0, 
+        #     actions=[ IncludeLaunchDescription(
+        #         PythonLaunchDescriptionSource(gui_launch),
+        #         launch_arguments={
+        #             'use_sim_time': use_sim_time,
+        #             'log_level': 'info'
+        #         }.items()
+        #     ) ],
+        #     condition=IfCondition(launch_gui)
+        # ),
 
         # 3. Publish URDF:
         TimerAction(

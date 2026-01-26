@@ -1,0 +1,25 @@
+prop_arm_gazebo_control:
+  ros__parameters:
+    motor_model:
+      prop_radius_m: 0.127
+      Ts: 0.01
+      L_w: 0.25
+      c1: 1.9823
+      c2: -0.9825
+      d1: 1.12e-4
+      d2: 1.11e-4
+      pwm_min_us: 1000
+      pwm_max_us: 2000
+      pwm_spin_min_us: 1050
+      motor_cmd_scale: 1.162
+
+    control:
+      command_effort_min: 0.0
+      command_effort_max: 3.0
+      initial_position: 0.4091592818742828
+      initial_velocity: 0.0
+
+    ros2_control:
+      robot_namespace: arm_sim
+      joint_name: arm_link_joint
+      actuator_index: 0

@@ -1,0 +1,4 @@
+prop_arm_gui:
+  ros__parameters:
+    calibration:
+      sync_tol_s: 0.05

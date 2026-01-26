@@ -12,10 +12,6 @@
     <!-- ROS2 dependencies -->
     <depend>rclcpp</depend>
     <depend>std_msgs</depend>
-    <depend>sensor_msgs</depend>
-    <depend>geometry_msgs</depend>
-    <depend>tf2</depend>
-    <depend>tf2_ros</depend>
 
     <!-- Qt6 build dependencies for ROS2 Jazzy -->
     <build_depend>libqt6core6</build_depend>
@@ -35,13 +31,8 @@
     <!-- System dependencies for proper display -->
     <build_depend>libgl1-mesa-dev</build_depend>
     <build_depend>libglu1-mesa-dev</build_depend>
-
     <exec_depend>libgl1-mesa-glx</exec_depend>
     <exec_depend>libglu1-mesa</exec_depend>
-
-    <!-- Launch dependencies -->
-    <exec_depend>launch_ros</exec_depend>
-    <exec_depend>launch</exec_depend>
 
     <!-- Test dependencies -->
     <test_depend>ament_lint_auto</test_depend>

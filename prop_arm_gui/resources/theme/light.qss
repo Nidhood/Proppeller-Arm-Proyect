@@ -1,0 +1,148 @@
+* {
+  font-family: "Inter", "Segoe UI", "DejaVu Sans", sans-serif;
+  font-size: 12px;
+}
+
+QMainWindow, QWidget {
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+/* Panels */
+QFrame#panel, QFrame#chartFrame, QFrame#valueTile {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #FFFFFF, stop:1 #F1F5F9);
+  border: 2px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+/* Titles */
+QLabel#title, QLabel#panelTitle, QLabel#chartTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1E40AF;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-bottom: 4px;
+}
+
+/* Value Tiles */
+QLabel#valueTileLabel {
+  font-weight: 600;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+QLabel#valueTileValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2563EB;
+}
+
+QLabel#valueTileUnit {
+  font-size: 12px;
+  color: #94A3B8;
+}
+
+QLabel#subtitle {
+  color: #64748B;
+}
+
+/* Buttons */
+QPushButton {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #3B82F6, stop:1 #2563EB);
+  border: 2px solid #2563EB;
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: #FFFFFF;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+QPushButton:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #2563EB, stop:1 #1E40AF);
+  border: 2px solid #1E40AF;
+}
+
+QPushButton:pressed {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #1E40AF, stop:1 #1E3A8A);
+}
+
+QPushButton#secondary {
+  background: rgba(241, 245, 249, 255);
+  border: 2px solid #CBD5E1;
+  color: #475569;
+}
+
+QPushButton#secondary:hover {
+  background: rgba(226, 232, 240, 255);
+  border: 2px solid #94A3B8;
+}
+
+/* Inputs */
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+  background: #FFFFFF;
+  border: 2px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #0F172A;
+  selection-background-color: #3B82F6;
+  selection-color: #FFFFFF;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+  border: 2px solid #3B82F6;
+  background: #F8FAFC;
+}
+
+/* Charts */
+QChartView {
+  background: #FFFFFF;
+  border: 2px solid #E2E8F0;
+  border-radius: 10px;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+  background: #F1F5F9;
+  width: 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+QScrollBar::handle:vertical {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                              stop:0 #CBD5E1, stop:1 #94A3B8);
+  border-radius: 6px;
+  min-height: 20px;
+}
+
+QScrollBar::handle:vertical:hover {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                              stop:0 #94A3B8, stop:1 #64748B);
+}
+
+QScrollBar:horizontal {
+  background: #F1F5F9;
+  height: 12px;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+}
+
+QScrollBar::handle:horizontal {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #CBD5E1, stop:1 #94A3B8);
+  border-radius: 6px;
+  min-width: 20px;
+}
+
+QScrollBar::handle:horizontal:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #94A3B8, stop:1 #64748B);
+}

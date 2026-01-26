@@ -1,0 +1,177 @@
+* {
+  font-family: "Segoe UI", "Helvetica Neue", "Arial", sans-serif;
+  font-size: 11px;
+}
+
+QMainWindow, QWidget {
+  background: #ECECEC;
+  color: #000000;
+}
+
+/* Panels */
+QFrame#panel, QFrame#chartFrame, QFrame#valueTile {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #FAFAFA, stop:1 #F0F0F0);
+  border: 1px solid #BEBEBE;
+  border-radius: 3px;
+  padding: 8px;
+}
+
+/* Titles */
+QLabel#title, QLabel#panelTitle, QLabel#chartTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0072BD;
+  padding-bottom: 3px;
+}
+
+/* Value Tiles */
+QLabel#valueTileLabel {
+  font-weight: 600;
+  color: #555555;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+QLabel#valueTileValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0072BD;
+}
+
+QLabel#valueTileUnit {
+  font-size: 11px;
+  color: #777777;
+}
+
+QLabel#subtitle {
+  color: #666666;
+}
+
+/* Buttons */
+QPushButton {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #FAFAFA, stop:1 #E8E8E8);
+  color: #000000;
+  border: 1px solid #A0A0A0;
+  border-radius: 3px;
+  padding: 6px 14px;
+  font-weight: 500;
+  min-height: 20px;
+}
+
+QPushButton:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #E6F2FF, stop:1 #D0E8FF);
+  border: 1px solid #0072BD;
+}
+
+QPushButton:pressed {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #CCE6FF, stop:1 #B3D9FF);
+  border: 1px solid #005A9E;
+}
+
+QPushButton#primary {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #0080D6, stop:1 #0072BD);
+  color: #FFFFFF;
+  border: 1px solid #005A9E;
+  font-weight: 600;
+}
+
+QPushButton#primary:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #0072BD, stop:1 #005A9E);
+}
+
+QPushButton#primary:pressed {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #005A9E, stop:1 #004578);
+}
+
+QPushButton#secondary {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #F5F5F5, stop:1 #E0E0E0);
+  color: #000000;
+  border: 1px solid #A0A0A0;
+}
+
+/* Inputs */
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+  background: #FFFFFF;
+  color: #000000;
+  border: 1px solid #B0B0B0;
+  border-radius: 2px;
+  padding: 4px 6px;
+  selection-background-color: #0072BD;
+  selection-color: #FFFFFF;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+  border: 2px solid #0072BD;
+  background: #FFFFFF;
+}
+
+/* Charts */
+QChartView {
+  background: #FFFFFF;
+  border: 1px solid #C0C0C0;
+  border-radius: 2px;
+}
+
+/* Scrollbars */
+QScrollBar:vertical {
+  background: #F0F0F0;
+  width: 16px;
+  border: 1px solid #D0D0D0;
+}
+
+QScrollBar::handle:vertical {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                              stop:0 #D8D8D8, stop:1 #C0C0C0);
+  min-height: 20px;
+  border-radius: 2px;
+}
+
+QScrollBar::handle:vertical:hover {
+  background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                              stop:0 #C0C0C0, stop:1 #A8A8A8);
+}
+
+QScrollBar:horizontal {
+  background: #F0F0F0;
+  height: 16px;
+  border: 1px solid #D0D0D0;
+}
+
+QScrollBar::handle:horizontal {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #D8D8D8, stop:1 #C0C0C0);
+  min-width: 20px;
+  border-radius: 2px;
+}
+
+QScrollBar::handle:horizontal:hover {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #C0C0C0, stop:1 #A8A8A8);
+}
+
+/* Tables */
+QTableView {
+  background: #FFFFFF;
+  alternate-background-color: #F8F8F8;
+  gridline-color: #D0D0D0;
+  selection-background-color: #0072BD;
+  selection-color: #FFFFFF;
+  border: 1px solid #C0C0C0;
+}
+
+QHeaderView::section {
+  background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                              stop:0 #F5F5F5, stop:1 #E8E8E8);
+  color: #000000;
+  padding: 5px;
+  border: 1px solid #D0D0D0;
+  font-weight: 600;
+}

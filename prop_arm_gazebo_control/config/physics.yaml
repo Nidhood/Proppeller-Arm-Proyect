@@ -1,0 +1,10 @@
+prop_arm_gazebo_control:
+  ros__parameters:
+    physics:
+      max_step_size: 0.001
+      real_time_factor: 1.0
+      real_time_update_rate: 1000.0
+
+    joint:
+      arm_damping: 0.03
+      arm_friction: 0.0

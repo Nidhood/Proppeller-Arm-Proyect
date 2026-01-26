@@ -7,6 +7,8 @@
 #include <map>
 #include <cstdint>
 #include <deque>
+#include <atomic>
+#include <mutex>
 
 #include "gz_ros2_control/gz_system_interface.hpp"
 #include "hardware_interface/hardware_info.hpp"
@@ -26,7 +28,7 @@ namespace sim = gz::sim;
 
 namespace prop_arm_gazebo_control
 {
-/// @brief Joint data structure for storing joint state and command data.
+
 struct JointData
 {
     sim::Entity sim_joint{sim::kNullEntity};
@@ -76,7 +78,7 @@ private:
                                 sim::EntityComponentManager &ecm);
 
     void publishToGazebo(double motor_speed);
-    void publishMotorTelemetry(double motor_speed);
+    void publishMotorTelemetry(double motor_speed, std::uint16_t pwm_snapshot);
     void publishJointTelemetry();
 
     // CONFIGURATION PARAMETERS
@@ -88,16 +90,24 @@ private:
     prop_arm_characterization::MotorSpeedModel motor_model_;
     unsigned int actuator_index_{0};
     double prop_radius_m_{0.1};           // Propeller radius [m]
+
+    // Legacy (kept for compatibility; ARX parameters are preferred now)
     double Kw_{0.0};                      // Motor gain [rad/s/V]
     double tau_w_{0.0};                   // Motor time constant [s]
-    double L_w_{0.0};                     // Motor delay [s]
+
+    // NEW: ARX(2,2) coefficients for discrete motor speed model (Ts-fixed)
+    double c1_{1.9823};
+    double c2_{-0.9825};
+    double d1_{1.12e-4};
+    double d2_{1.11e-4};
+
+    double L_w_{0.10};                    // Motor delay [s]
     double Ts_{0.01};                     // Sampling time [s]
+    std::uint16_t pwm_spin_min_us_{0};
     std::uint16_t pwm_ref_us_{1500};      // Reference PWM [us]
     std::uint16_t pwm_max_us_{2000};      // Max PWM limit [us]
     std::uint16_t pwm_min_us_{1000};      // Min PWM limit [us]
     std::uint16_t current_pwm_us_{1500};  // Current PWM command [us]
-    int delay_steps_{0};
-    std::deque<std::uint16_t> pwm_delay_line_;
     double motor_cmd_scale_{1.0};
 
     // ROS2 & GAZEBO COMMUNICATION
@@ -121,6 +131,16 @@ private:
     std::unordered_map<std::string, JointData> joints_;
     std::vector<hardware_interface::StateInterface> state_interfaces_;
     std::vector<hardware_interface::CommandInterface> command_interfaces_;
+
+    // Runtime tunables (live)
+    std::atomic<double> rt_viscous_arm_{0.0};
+    std::atomic<double> rt_coulomb_arm_{0.0};
+    std::atomic<double> rt_thrust_k_{1.0};
+    std::mutex motor_mtx_;
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handle_;
+    void declareRuntimeParams_();
+    rcl_interfaces::msg::SetParametersResult onParams_(const std::vector<rclcpp::Parameter> &params);
+    static double signNoZero_(double x) noexcept;
 };
 
 } // namespace prop_arm_gazebo_control

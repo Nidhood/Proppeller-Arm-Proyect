@@ -1,10 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="prop_arm">
 
+  <!-- Load physics-only parameters -->
+  <xacro:arg name="physics_file" default="$(find-pkg-share prop_arm_description)/config/dynamics_params.xacro.yaml"/>
+
+  <!-- Convenience aliases -->
+  <xacro:property name="RAW" value="${xacro.load_yaml('$(arg physics_file)')}"/>
+  <xacro:property name="P" value="${RAW['prop_arm_description']['ros__parameters']}"/>
+  <xacro:property name="L" value="${P['links']}"/>
+  <xacro:property name="J" value="${P['joints']}"/>
+
+  <!-- Helper macro to reduce repetition -->
+  <xacro:macro name="inertial_from_yaml" params="link_name">
+    <inertial>
+      <mass value="${L[link_name]['mass']}"/>
+      <inertia ixx="${L[link_name]['inertia'][0]}" ixy="${L[link_name]['inertia'][1]}" ixz="${L[link_name]['inertia'][2]}" iyy="${L[link_name]['inertia'][3]}" iyz="${L[link_name]['inertia'][4]}" izz="${L[link_name]['inertia'][5]}"/>
+      <origin rpy="0 0 0" xyz="${L[link_name]['com_xyz'][0]} ${L[link_name]['com_xyz'][1]} ${L[link_name]['com_xyz'][2]}"/>
+    </inertial>
+  </xacro:macro>
+
   <!-- World link -->
   <link name="world"/>
 
-  <!-- Main robot link -->
+  <!-- Base link -->
   <link name="base_link">
     <collision name="base_collision">
       <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -12,11 +30,7 @@
         <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/collisions/base.stl" scale="1 1 1"/>
       </geometry>
     </collision>
-    <inertial>
-      <mass value="2.343"/>
-      <inertia ixx="0.24075" ixy="-0.00000" ixz="0.00000" iyy="0.23379" iyz="0.03671" izz="0.01482"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.00883 0.00000 0.19143"/>
-    </inertial>
+    <xacro:inertial_from_yaml link_name="base_link"/>
     <visual name="base">
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -33,11 +47,7 @@
         <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/collisions/arm.stl" scale="1 1 1"/>
       </geometry>
     </collision>
-    <inertial>
-      <mass value="0.4067"/>
-      <inertia ixx="0.00100" ixy="0.00000" ixz="0.00000" iyy="0.01086" iyz="0.00000" izz="0.01086"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="-0.32745 -0.00011 0.03646"/>
-    </inertial>
+    <xacro:inertial_from_yaml link_name="arm_link"/>
     <visual name="arm">
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -46,7 +56,7 @@
     </visual>
   </link>
 
-  <!-- Propeller link-->
+  <!-- Propeller link -->
   <link name="prop_link">
     <collision name="prop_collision">
       <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -54,11 +64,7 @@
         <mesh filename="package://prop_arm_description/models/prop_arm_v2/meshes/collisions/prop.stl" scale="1 1 1"/>
       </geometry>
     </collision>
-    <inertial>
-      <mass value="0.0153"/>
-      <inertia ixx="0.00000033" ixy="0.00000148" ixz="0.00000000" iyy="0.00005558" iyz="-0.00000000" izz="0.00005585"/>
-      <origin rpy="0.00000 0.00000 0.00000" xyz="0.00000 0.00000 0.00454"/>
-    </inertial>
+    <xacro:inertial_from_yaml link_name="prop_link"/>
     <visual name="prop">
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
@@ -77,12 +83,11 @@
   <joint name="arm_link_joint" type="revolute">
     <axis xyz="0 1 0"/>
     <origin rpy="0 -1.57080 -1.57080" xyz="0.00001 -0.00000 0.45833"/>
-    <limit lower="0.16643634279943126" upper="3.1416" effort="1500.0" velocity="10.0"/>
-    <dynamics damping="0.0326233" friction="0.0"/>
+    <limit lower="${J['arm_link_joint']['limit_lower']}" upper="${J['arm_link_joint']['limit_upper']}" effort="${J['arm_link_joint']['effort']}" velocity="${J['arm_link_joint']['velocity']}"/>
+    <dynamics damping="${J['arm_link_joint']['damping']}" friction="${J['arm_link_joint']['friction']}"/>
     <parent link="base_link"/>
     <child link="arm_link"/>
   </joint>
-
 
   <!-- Joint between arm and propeller -->
   <joint name="prop_link_joint" type="continuous">
@@ -101,4 +106,5 @@
 
   <!-- Include control interface -->
   <xacro:include filename="$(find prop_arm_gazebo_control)/urdf/prop_arm_control.xacro"/>
+
 </robot>
